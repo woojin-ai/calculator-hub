@@ -207,23 +207,16 @@ const SECTIONS: LegalSection[] = [
     id: "privacy-officer",
     heading: "8. 개인정보 보호책임자 및 문의처",
     body: (
-      <div className="flex flex-col gap-2">
-        <p>
-          개인정보 관련 문의, 열람·정정·삭제 요청은 아래 이메일로 연락해
-          주시기 바랍니다.
-        </p>
-        <ul className="list-inside list-disc space-y-1">
-          <li>
-            이메일:{" "}
-            <a
-              href="mailto:sss159228@gmail.com"
-              className="text-brand-primary underline underline-offset-2"
-            >
-              sss159228@gmail.com
-            </a>
-          </li>
-        </ul>
-      </div>
+      <p>
+        개인정보 관련 문의, 열람·정정·삭제 요청은{" "}
+        <a
+          href="/support#ask"
+          className="text-brand-primary underline underline-offset-2"
+        >
+          고객센터 문의하기(/support#ask)
+        </a>
+        를 통해 연락해 주시기 바랍니다.
+      </p>
     ),
   },
   {
