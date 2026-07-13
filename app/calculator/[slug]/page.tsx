@@ -39,6 +39,11 @@ export async function generateMetadata({
   return {
     title: `${calculator.title} | 계산기 허브`,
     description: calculator.shortDescription,
+    // coming-soon 스텁 페이지는 콘텐츠가 없으므로 검색엔진 색인에서 제외한다.
+    robots:
+      calculator.status === "coming-soon"
+        ? { index: false, follow: true }
+        : { index: true, follow: true },
   };
 }
 
