@@ -70,9 +70,14 @@ export default function Home() {
           <h2 className="mb-4 text-xl font-bold text-brand-text">
             지금 사용 가능한 계산기
           </h2>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="flex flex-wrap justify-center gap-4">
             {liveCalculators.map((calculator) => (
-              <CalculatorCard key={calculator.slug} calculator={calculator} />
+              <div
+                key={calculator.slug}
+                className="w-full sm:w-[calc(50%-0.5rem)] lg:w-[calc(33.333%-0.6667rem)]"
+              >
+                <CalculatorCard calculator={calculator} />
+              </div>
             ))}
           </div>
         </section>
@@ -102,7 +107,7 @@ export default function Home() {
                 <h3 className="text-base font-semibold text-brand-text">
                   {categoryInfo[category].title}
                 </h3>
-                <p className="text-xs leading-relaxed text-brand-text-secondary">
+                <p className="text-pretty text-xs leading-relaxed text-brand-text-secondary">
                   {categoryInfo[category].description}
                 </p>
                 <p className="text-xs text-brand-text-secondary">

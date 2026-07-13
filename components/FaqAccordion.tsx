@@ -15,7 +15,7 @@ export default function FaqAccordion({ items }: { items: FaqItem[] }) {
                 ⌄
               </span>
             </summary>
-            <p className="mt-3 text-sm leading-relaxed text-brand-text-secondary">
+            <p className="mt-3 text-pretty text-sm leading-relaxed text-brand-text-secondary">
               {item.answer}
             </p>
           </details>

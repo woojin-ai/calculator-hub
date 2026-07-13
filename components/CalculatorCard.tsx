@@ -31,7 +31,7 @@ export default function CalculatorCard({
           </span>
         )}
       </div>
-      <p className="text-xs leading-relaxed text-brand-text-secondary">
+      <p className="text-pretty text-xs leading-relaxed text-brand-text-secondary">
         {calculator.shortDescription}
       </p>
     </Link>
