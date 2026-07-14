@@ -8,6 +8,7 @@ import {
   type LoanPrepaymentResult,
 } from "@/lib/loan-prepayment";
 import { formatWon } from "@/lib/loan";
+import { INPUT_BASE as inputBase } from "@/lib/inputClass";
 
 interface FieldErrors {
   amount?: string;
@@ -22,9 +23,6 @@ function formatAmountInput(raw: string): string {
   if (digits === "") return "";
   return Number(digits).toLocaleString("ko-KR");
 }
-
-const inputBase =
-  "h-12 rounded-lg border px-4 text-base text-brand-text outline-hidden transition-colors focus:border-brand-primary focus:ring-4 focus:ring-brand-primary/15";
 
 /** 금액을 "약 ○○만원" / (1만원 미만) "약 ○,○00원" 형태로 반올림 표기(요약용). */
 function formatApprox(amount: number): string {

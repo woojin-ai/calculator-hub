@@ -8,6 +8,7 @@ import {
   type LoanResult,
   type RepaymentType,
 } from "@/lib/loan";
+import { INPUT_BASE as inputBase } from "@/lib/inputClass";
 
 type PeriodUnit = "year" | "month";
 
@@ -25,9 +26,6 @@ function formatPrincipalInput(raw: string): string {
   if (digits === "") return "";
   return Number(digits).toLocaleString("ko-KR");
 }
-
-const inputBase =
-  "h-12 rounded-lg border px-4 text-base text-brand-text outline-hidden transition-colors focus:border-brand-primary focus:ring-4 focus:ring-brand-primary/15";
 
 export default function LoanInterestCalculator() {
   const [repaymentType, setRepaymentType] =

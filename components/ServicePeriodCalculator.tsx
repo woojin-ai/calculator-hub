@@ -6,9 +6,7 @@ import {
   formatKoreanDatePlain,
   type ServicePeriodResult,
 } from "@/lib/service-period";
-
-const inputBase =
-  "h-12 rounded-lg border px-4 text-base text-brand-text outline-hidden transition-colors focus:border-brand-primary focus:ring-4 focus:ring-brand-primary/15";
+import { INPUT_BASE as inputBase } from "@/lib/inputClass";
 
 type FieldError = { field: "start" | "end"; message: string } | null;
 

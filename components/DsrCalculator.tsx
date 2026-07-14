@@ -2,6 +2,7 @@
 
 import { useRef, useState, type FormEvent } from "react";
 import { calculateLoan, formatWon } from "@/lib/loan";
+import { INPUT_BASE as inputBase } from "@/lib/inputClass";
 
 type PeriodUnit = "year" | "month";
 type Zone = "safe" | "caution" | "over";
@@ -32,9 +33,6 @@ interface DsrResult {
 // 규제 기준선(참고·해석/배지 전용 — 계산·판정 로직 아님, 기획 §1-2)
 const DSR_BANK_LIMIT = 40; // 은행권 차주단위 DSR 기준선(일반적으로 40%)
 const DSR_2ND_LIMIT = 50; // 제2금융권 DSR 기준선(일반적으로 50%)
-
-const inputBase =
-  "h-12 rounded-lg border px-4 text-base text-brand-text outline-hidden transition-colors focus:border-brand-primary focus:ring-4 focus:ring-brand-primary/15";
 
 /** 입력 중 천단위 콤마 서식을 적용한다 (숫자만 남기고 콤마 삽입; 음수·문자·소수점 원천 차단). */
 function formatAmountInput(raw: string): string {

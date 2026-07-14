@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { calculateManAge, type ManAgeResult } from "@/lib/age";
+import { INPUT_BASE } from "@/lib/inputClass";
 
 export default function AgeCalculator() {
   const [birthDate, setBirthDate] = useState("");
@@ -46,7 +47,7 @@ export default function AgeCalculator() {
             value={birthDate}
             onChange={(event) => setBirthDate(event.target.value)}
             max={new Date().toISOString().slice(0, 10)}
-            className={`h-12 rounded-lg border px-4 text-base text-brand-text outline-hidden transition-colors focus:border-brand-primary focus:ring-4 focus:ring-brand-primary/15 ${
+            className={`${INPUT_BASE} ${
               error ? "border-brand-warning" : "border-brand-border"
             }`}
           />

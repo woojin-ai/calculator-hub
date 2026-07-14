@@ -8,6 +8,7 @@ import {
 } from "@/lib/severance";
 import { formatKoreanDatePlain } from "@/lib/service-period";
 import { formatWon } from "@/lib/loan";
+import { INPUT_BASE as inputBase } from "@/lib/inputClass";
 
 /** 입력 중 천단위 콤마 서식을 적용한다 (숫자만 남기고 콤마 삽입; 음수·문자 원천 차단). */
 function formatAmountInput(raw: string): string {
@@ -15,9 +16,6 @@ function formatAmountInput(raw: string): string {
   if (digits === "") return "";
   return Number(digits).toLocaleString("ko-KR");
 }
-
-const inputBase =
-  "h-12 rounded-lg border px-4 text-base text-brand-text outline-hidden transition-colors focus:border-brand-primary focus:ring-4 focus:ring-brand-primary/15";
 
 type FieldError =
   | { field: "start" | "end" | "recentPay"; message: string }

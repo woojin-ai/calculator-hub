@@ -3,6 +3,10 @@
 import { useRef, useState, type FormEvent } from "react";
 import { calculateSalary, type SalaryResult } from "@/lib/salary";
 import { formatWon } from "@/lib/loan";
+import {
+  INPUT_BASE as inputBase,
+  SELECT_BASE as selectBase,
+} from "@/lib/inputClass";
 
 /** 입력 중 천단위 콤마 서식을 적용한다 (숫자만 남기고 콤마 삽입). */
 function formatAmountInput(raw: string): string {
@@ -10,12 +14,6 @@ function formatAmountInput(raw: string): string {
   if (digits === "") return "";
   return Number(digits).toLocaleString("ko-KR");
 }
-
-const inputBase =
-  "h-12 rounded-lg border px-4 text-base text-brand-text outline-hidden transition-colors focus:border-brand-primary focus:ring-4 focus:ring-brand-primary/15";
-
-const selectBase =
-  "h-12 w-full appearance-none rounded-lg border border-brand-border bg-white pl-4 pr-9 text-base text-brand-text outline-hidden transition-colors focus:border-brand-primary focus:ring-4 focus:ring-brand-primary/15";
 
 const DEPENDENTS_OPTIONS = Array.from({ length: 10 }, (_, i) => i + 1); // 1~10
 
