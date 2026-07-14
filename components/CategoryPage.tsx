@@ -4,6 +4,7 @@ import {
   type CalculatorCategory,
 } from "@/lib/calculators";
 import CalculatorCard from "@/components/CalculatorCard";
+import { buildCategoryJsonLd } from "@/lib/site-jsonld";
 
 export default function CategoryPage({
   category,
@@ -15,6 +16,15 @@ export default function CategoryPage({
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-12">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(buildCategoryJsonLd(category)).replace(
+            /</g,
+            "\\u003c",
+          ),
+        }}
+      />
       <h1 className="text-2xl font-bold text-brand-text sm:text-[2rem]">
         {info.title}
       </h1>

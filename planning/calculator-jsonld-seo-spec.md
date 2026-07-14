@@ -201,3 +201,150 @@ v1 승인·배포 후 별도 티켓으로 검토 권장. 이번엔 착수하지 
 - 주입: `<script type="application/ld+json" dangerouslySetInnerHTML={{__html: JSON.stringify(graph).replace(/</g,"\\u003c")}} />`.
 - coming-soon/ faq 없음 등 방어 분기(§4) 준수. 화면 변경 0.
 - 판정: §5 체크리스트. Rich Results Test로 대표 2개 URL 검증.
+
+---
+
+## 8. 사이트 전역 + 카테고리 JSON-LD 구현 스펙 (v2)
+
+- 문서 목적: §6 "다음 단계 제안" (a)(b) 항목을 **구현 착수용 스펙**으로 확정한다. v1(상세 페이지 `@graph`)의 패턴을 **사이트 전역(WebSite/Organization)** 과 **카테고리 페이지(CollectionPage/ItemList)** 로 확장.
+- 전제: v1과 동일하게 **비가시(invisible) SEO 작업.** 화면 변경 0, 신규 데이터 필드 0(전부 기존 `calculators`/`categoryInfo`/`SITE_URL`에서 파생). design 단계 생략.
+- 마스터 locked 결정(재논의 금지, 아래에 그대로 반영): WebSite에 SearchAction 미포함 / Organization에 logo 미포함 / 루트는 WebSite+Organization 단일 @graph 공통 출력 / 카테고리는 CollectionPage+ItemList 단일 @graph / ItemList는 live만 / 트레일링 슬래시 없음.
+
+### 8-0. 현황 확인 (읽고 검증한 사실)
+
+| 항목 | 확인 내용 |
+|---|---|
+| 루트 레이아웃 | `app/layout.tsx` — 서버 컴포넌트(`"use client"` 없음), `<html lang="ko">` + `<body>` 안에 `SiteHeader`/`main`/`SiteFooter`. 현재 JSON-LD 없음. |
+| 카테고리 렌더 | `app/{category}/page.tsx` → `<CategoryPage category="..." />`. 실제 렌더는 `components/CategoryPage.tsx`(서버 컴포넌트, `"use client"` 없음). 현재 JSON-LD 없음. |
+| 카테고리 목록 소스 | `getCalculatorsByCategory(category)` — `category` 일치만 필터하고 **status 필터는 하지 않음**(live+coming-soon 모두 반환, `lib/calculators.ts` 확인). ItemList 구성 시 **호출부에서 live 필터 필수.** |
+| categoryInfo | 4종(salary/loan/date/life) 각 `{ title, description }` 보유. |
+| SITE_URL | `https://calculator-hub-delta.vercel.app` (`lib/site.ts`), 트레일링 슬래시 없음. |
+| 상세 헬퍼 이스케이프 | `JSON.stringify(x).replace(/</g,"\\u003c")` + `dangerouslySetInnerHTML`(v1 §4-4). v2도 **동일 방식 재사용.** |
+
+### 8-1. 루트(사이트 전역) 헬퍼 설계 — WebSite + Organization
+
+**신규 순수 헬퍼 파일: `lib/site-jsonld.ts`**
+
+- 시그니처: `export function buildSiteJsonLd(): object`
+  - 인자 없음(입력 상수뿐). 항상 동일한 객체를 반환(순수·결정적). 값은 `SITE_URL`(`@/lib/site`)에서만 파생.
+  - 반환: `{ "@context": "https://schema.org", "@graph": [WebSite, Organization] }`.
+- 왜 헬퍼 분리: v1 `buildCalculatorJsonLd`와 대칭. QA가 순수 함수 단위로 노드/필드 스팟체크 용이, `layout.tsx`에 리터럴을 흩뿌리지 않음.
+
+**주입 위치·방식: `app/layout.tsx`**
+
+- 위치: `<body>` **최상단**(SiteHeader 바로 앞)에 단일 `<script type="application/ld+json">` 1개.
+  - 근거: 상세 페이지 헬퍼(v1)가 이미 body 내 script를 쓰고 정상 동작. `<head>` 대신 body 상단을 택해 v1과 방식 일치(주입 패턴 단일화, QA 판정 단순). Google은 body 내 ld+json도 정상 인식.
+  - `metadata` export(Next Metadata API)로는 임의 `@graph` script를 못 넣으므로 직접 `<script>` 렌더가 맞다.
+- 주입 코드 형태(개발팀 재량, 방식만 고정):
+  ```
+  <script
+    type="application/ld+json"
+    dangerouslySetInnerHTML={{ __html: JSON.stringify(buildSiteJsonLd()).replace(/</g, "\\u003c") }}
+  />
+  ```
+- 출력 범위: layout이므로 **모든 페이지(홈/상세/카테고리 등 전 페이지)에 공통 출력**됨. 상세·카테고리 페이지에는 페이지별 script와 **함께 2개**가 나가지만, `@type`이 서로 달라(WebSite/Organization vs BreadcrumbList/WebApplication/FAQPage 또는 CollectionPage/ItemList) 중복/충돌이 아니다 — schema.org는 한 페이지 다중 ld+json script를 허용(locked 결정 3).
+
+### 8-2. 카테고리 헬퍼 설계 — CollectionPage + ItemList
+
+**신규 순수 헬퍼(위치 제안: `lib/category-jsonld.ts` 또는 `lib/site-jsonld.ts`에 병치 — 개발팀 재량)**
+
+- 시그니처: `export function buildCategoryJsonLd(category: CalculatorCategory): object`
+  - 입력: 카테고리 키 1개. 반환: `{ "@context": "https://schema.org", "@graph": [CollectionPage, ItemList] }`.
+  - **live 필터 필수:** 헬퍼 내부에서 `getCalculatorsByCategory(category).filter((c) => c.status === "live")` 로 live만 추린 뒤 ItemList를 구성(§8-0에서 확인: `getCalculatorsByCategory`는 status를 안 거름).
+  - ItemList `itemListElement`는 필터된 live 배열을 `position` 1..N으로 매김(배열 인덱스 기반, coming-soon 제외 후의 순서). `numberOfItems`(선택)를 넣는다면 live 개수와 일치시킬 것.
+- 빈 ItemList 처리(locked 결정 4 명시 요청): **live 계산기가 0개면 ItemList 노드를 @graph에서 생략하고 CollectionPage만 출력한다.** 빈 `itemListElement: []`를 내보내지 않는다(무의미한 빈 ItemList는 검증 경고 유발 가능). 현재 4개 카테고리 전부 live≥1이라 실제로는 안 걸리지만 방어 필수.
+
+**주입 위치·방식: `components/CategoryPage.tsx`**
+
+- `CategoryPage`는 서버 컴포넌트이므로 반환 JSX 최상단에 단일 script 주입 가능. `getCalculatorsByCategory` 결과는 이미 이 컴포넌트가 받고 있으므로 헬퍼에 `category`만 넘기면 됨(중복 조회는 미미, 순수성 우선).
+- 주입 코드 형태(v1·8-1과 동일 방식):
+  ```
+  <script
+    type="application/ld+json"
+    dangerouslySetInnerHTML={{ __html: JSON.stringify(buildCategoryJsonLd(category)).replace(/</g, "\\u003c") }}
+  />
+  ```
+- 카테고리 페이지 최종 script 개수: layout의 site script(1) + category script(1) = **2개**(§8-5 QA 기준).
+
+### 8-3. 노드별 필드 표 (locked 결정 그대로)
+
+**WebSite (루트, 항상)**
+
+| 필드 | 값 | 소스 |
+|---|---|---|
+| `@type` | `"WebSite"` | 리터럴 |
+| `name` | `"계산기 허브"` | 리터럴 |
+| `url` | `SITE_URL` | `lib/site.ts` |
+| `inLanguage` | `"ko"` | 리터럴(layout html lang과 일치) |
+
+- **`potentialAction`/`SearchAction` 미포함** — 실제 사이트 검색 엔드포인트가 존재하지 않음(§6 본인 경고: "실제 검색 엔드포인트 존재 시에만"). 없는 검색 URL을 지어내지 않는다.
+
+**Organization (루트, 항상)**
+
+| 필드 | 값 | 소스 |
+|---|---|---|
+| `@type` | `"Organization"` | 리터럴 |
+| `name` | `"계산기 허브"` | 리터럴 |
+| `url` | `SITE_URL` | `lib/site.ts` |
+
+- **`logo` 필드 미포함** — 실제 브랜드 로고 래스터 에셋이 없음(`public/`에 카테고리 아이콘 webp와 Next 기본 svg만 존재, 브랜드 로고 아님). 가짜 로고 URL 생성 금지(§6 aggregateRating "조작 금지" 원칙과 동일). 실제 로고 에셋이 생기면 추가 → **백로그(핸드오프 참조).**
+
+**CollectionPage (카테고리, 항상)**
+
+| 필드 | 값 | 소스 |
+|---|---|---|
+| `@type` | `"CollectionPage"` | 리터럴 |
+| `name` | `categoryInfo[category].title` | `lib/calculators.ts` |
+| `description` | `categoryInfo[category].description` | `lib/calculators.ts` |
+| `url` | `` `${SITE_URL}/${category}` `` | 파생(트레일링 슬래시 없음) |
+| `inLanguage` | `"ko"` | 리터럴 |
+
+**ItemList (카테고리, live≥1일 때만)**
+
+| 필드 | 값 | 소스 |
+|---|---|---|
+| `@type` | `"ItemList"` | 리터럴 |
+| `itemListElement[i].@type` | `"ListItem"` | 리터럴 |
+| `itemListElement[i].position` | `1..N`(live 필터 후 순번) | 파생 |
+| `itemListElement[i].name` | `calculator.title` | live 계산기 |
+| `itemListElement[i].url` | `` `${SITE_URL}/calculator/${calculator.slug}` `` | 파생 |
+
+- ListItem은 v1 BreadcrumbList와 달리 `item`이 아니라 **`url`** 키를 쓴다(ItemList의 단순 URL 목록 관례 — schema.org ItemList 예제 정합). position은 1부터 연속.
+
+### 8-4. 엣지 케이스 / 방어
+
+1. **coming-soon 제외(ItemList):** `getCalculatorsByCategory`가 status를 안 거르므로 헬퍼 내부에서 **`status === "live"` 필터 필수.** coming-soon은 noindex(상세 로직)+sitemap 제외 대상 → ItemList에 넣으면 색인 신호 상충. 현재 0개지만 방어.
+2. **빈 ItemList:** live 0개면 ItemList 노드 **생략**(CollectionPage만). 빈 배열 ItemList를 내보내지 않음(§8-2).
+3. **coming-soon 카테고리 페이지 자체:** 카테고리 페이지는 항상 index(카테고리엔 noindex 로직 없음) → CollectionPage는 live 유무와 무관하게 항상 출력. ItemList만 조건부.
+4. **이스케이프:** 루트·카테고리 모두 v1과 동일 `JSON.stringify(x).replace(/</g,"\\u003c")` + `dangerouslySetInnerHTML`. `<script>{...}</script>` 자식 텍스트 방식 금지(React가 `<`,`>` 이스케이프해 무효 JSON 위험). categoryInfo description에 특수문자 없으나 방식은 통일.
+5. **트레일링 슬래시 없음:** `SITE_URL`+경로 그대로 조합, 슬래시 추가 안 함(sitemap.ts·v1 §4-7과 동일 → canonical/sitemap 문자열 일치). CollectionPage url=`/{category}`, ListItem url=`/calculator/{slug}`.
+6. **단일 @graph, script 1개/헬퍼:** 루트 script 1개(WebSite+Organization), 카테고리 script 1개(CollectionPage+[ItemList]). 각 헬퍼는 정확히 1개 script로 직렬화.
+7. **다중 script 공존:** 상세=site(1)+calculator(1)=2, 카테고리=site(1)+category(1)=2, 홈/기타=site(1)=1. `@type` 상이 → 충돌 아님.
+
+### 8-5. QA·마스터 검증 기준 (통과 판정)
+
+빌드/배포 전 아래 전부 충족 시 PASS:
+
+1. **빌드 무회귀:** `next build` 성공, 정적 생성 페이지 수 변화 없음(현재 28페이지 그대로), 타입 에러 0, 기존 lint 통과.
+2. **script 개수(페이지 유형별):**
+   - 홈 및 기타 일반 페이지: `script[type="application/ld+json"]` **정확히 1개**(site 전역).
+   - 카테고리 4페이지(`/salary`,`/loan`,`/date`,`/life`): **정확히 2개**(site + category).
+   - 계산기 상세 live 페이지: **정확히 2개**(site + calculator v1). coming-soon 상세(있다면): **1개**(site만; v1 헬퍼는 null).
+3. **JSON.parse 성공:** 모든 신규 script가 `JSON.parse` 성공(브레이크아웃/이스케이프 오류 0), `@context`+`@graph` 존재.
+4. **노드 구성 검증:**
+   - 루트 script @graph: `WebSite` + `Organization` 정확히 2노드. **WebSite에 `potentialAction` 없음, Organization에 `logo` 없음**(locked 결정 확인).
+   - 카테고리 script @graph: `CollectionPage`(+ live≥1이면 `ItemList`). ItemList의 ListItem 개수 == 해당 카테고리 **live 계산기 수**(coming-soon 제외 확인).
+5. **필드 스팟체크(카테고리 1~2개 샘플, 예 `/salary`):**
+   - CollectionPage `name==categoryInfo[cat].title`, `description==categoryInfo[cat].description`, `url==${SITE_URL}/salary`(트레일링 슬래시 없음), `inLanguage=="ko"`.
+   - ItemList position 1..N 연속, 각 `url==${SITE_URL}/calculator/{slug}`, name==title.
+   - 루트: WebSite/Organization `name=="계산기 허브"`, `url==SITE_URL`.
+6. **Schema Validator / Rich Results Test:** 대표 URL(루트 `/`, 카테고리 `/salary`)에서 구문 오류 0. (WebSite/Organization/CollectionPage/ItemList는 별점류 리치결과 대상 아님 — 시각 리치결과 미노출은 정상, 엔티티 신호 목적.)
+7. **시각 변화 0:** 배포 전/후 홈·카테고리 페이지 스크린샷 diff 없음(비가시). 레이아웃/텍스트/CLS 변화 없음.
+8. **시크릿 0:** 신규 파일/변경에 하드코딩 시크릿·토큰·키 없음(값은 전부 공개 상수 `SITE_URL`·리터럴에서만 파생).
+
+### 8-6. 핸드오프
+
+- **개발팀:** `lib/site-jsonld.ts`(`buildSiteJsonLd`)·카테고리 헬퍼(`buildCategoryJsonLd`) 순수 함수 신규 + `app/layout.tsx` body 상단 주입 + `components/CategoryPage.tsx` 주입. 신규 데이터 필드 0, 화면 변경 0. §8-3 필드표/§8-4 방어 준수, v1과 동일 이스케이프. **locked 결정 재논의 금지**(SearchAction·logo 미포함).
+- **QA팀:** §8-5 체크리스트. 특히 script 개수(유형별 1/2)와 ItemList의 live 필터(coming-soon 제외), 루트 노드에 SearchAction/logo 부재 확인.
+- **디자인/브랜드(백로그, 이번 범위 밖):** 실제 브랜드 로고 래스터(png/svg) 에셋이 확보되면 그때 Organization에 `logo` 추가 티켓 재개. 지금은 조작 금지 원칙상 미포함. → **마스터에게 "로고 에셋 확보 여부"는 열린 항목으로 보고.**
+- **마스터 확인 필요(방향 전환성):** 없음. 본 v2는 locked 결정 범위 내 확장이라 별도 방향 전환 승인 불필요. 단 향후 실제 사이트 검색 기능이 생기면 WebSite `potentialAction`(SearchAction) 추가는 **별도 티켓**으로 올릴 것(현재는 엔드포인트 없어 보류).
