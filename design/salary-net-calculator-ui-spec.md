@@ -182,7 +182,8 @@ bg-gradient-to-br from-emerald-50 to-white p-4 sm:p-6`. 대출 결과 카드와 
 연 환산 약 34,950,936 원                  ← 보조 대표: mt-1 text-xl font-semibold text-brand-text
                                             tabular-nums (Accent 아님)
 세전 연봉 4,000만원에서 4대 보험 약        ← 요약 문구(동적): mt-2 text-sm text-brand-text-secondary
-30만원과 세금 약 11만원이 공제된 금액입니다.   (기획 §2 1문단을 입력값 기반으로 동적 축약, §3-5)
+30만원과 세금 약 12만원이 공제된 금액입니다.   (기획 §2 1문단을 입력값 기반으로 동적 축약, §3-5)
+                                            ※ 앵커(연봉4천/부양1/비과세20만)의 월 세금 합계=116,476원 → formatApprox 반올림 시 "약 12만원"(엔진 실측 일치, 2026-07-14 문서 typo 수정)
 ```
 
 - 히어로/보조 대표 모두 `tabular-nums`, 천단위 콤마 필수.

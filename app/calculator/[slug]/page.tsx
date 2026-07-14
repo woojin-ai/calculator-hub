@@ -12,6 +12,7 @@ import DdayCalculator from "@/components/DdayCalculator";
 import BmiCalculator from "@/components/BmiCalculator";
 import LoanInterestCalculator from "@/components/LoanInterestCalculator";
 import SalaryNetCalculator from "@/components/SalaryNetCalculator";
+import UnitConverter from "@/components/UnitConverter";
 import ResultInterpretation from "@/components/ResultInterpretation";
 import FaqAccordion from "@/components/FaqAccordion";
 import RelatedCalculators from "@/components/RelatedCalculators";
@@ -23,6 +24,7 @@ const CALCULATOR_COMPONENTS: Record<string, React.ComponentType> = {
   "bmi-calculator": BmiCalculator,
   "loan-interest-calculator": LoanInterestCalculator,
   "salary-net-calculator": SalaryNetCalculator,
+  "unit-converter": UnitConverter,
 };
 
 export function generateStaticParams() {
