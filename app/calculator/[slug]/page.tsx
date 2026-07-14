@@ -7,6 +7,7 @@ import {
   getCalculatorBySlug,
   getRelatedCalculators,
 } from "@/lib/calculators";
+import { buildCalculatorJsonLd } from "@/lib/calculator-jsonld";
 import AgeCalculator from "@/components/AgeCalculator";
 import DdayCalculator from "@/components/DdayCalculator";
 import BmiCalculator from "@/components/BmiCalculator";
@@ -77,9 +78,18 @@ export default async function CalculatorPage({
 
   const CalculatorComponent = CALCULATOR_COMPONENTS[calculator.slug];
   const related = getRelatedCalculators(calculator.slug);
+  const jsonLd = buildCalculatorJsonLd(calculator);
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-12">
+      {jsonLd && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c"),
+          }}
+        />
+      )}
       <nav className="mb-2 text-xs text-brand-text-secondary">
         <Link href="/" className="hover:text-brand-primary">
           홈
