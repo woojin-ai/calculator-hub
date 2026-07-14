@@ -12,6 +12,7 @@ import DdayCalculator from "@/components/DdayCalculator";
 import BmiCalculator from "@/components/BmiCalculator";
 import ElectricityBillCalculator from "@/components/ElectricityBillCalculator";
 import LoanInterestCalculator from "@/components/LoanInterestCalculator";
+import LoanPrepaymentFeeCalculator from "@/components/LoanPrepaymentFeeCalculator";
 import SalaryNetCalculator from "@/components/SalaryNetCalculator";
 import ServicePeriodCalculator from "@/components/ServicePeriodCalculator";
 import SeverancePayCalculator from "@/components/SeverancePayCalculator";
@@ -27,6 +28,7 @@ const CALCULATOR_COMPONENTS: Record<string, React.ComponentType> = {
   "bmi-calculator": BmiCalculator,
   "electricity-bill-calculator": ElectricityBillCalculator,
   "loan-interest-calculator": LoanInterestCalculator,
+  "loan-prepayment-fee": LoanPrepaymentFeeCalculator,
   "salary-net-calculator": SalaryNetCalculator,
   "service-period-calculator": ServicePeriodCalculator,
   "severance-pay-calculator": SeverancePayCalculator,
