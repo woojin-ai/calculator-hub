@@ -10,6 +10,7 @@ import {
 import AgeCalculator from "@/components/AgeCalculator";
 import DdayCalculator from "@/components/DdayCalculator";
 import BmiCalculator from "@/components/BmiCalculator";
+import DsrCalculator from "@/components/DsrCalculator";
 import ElectricityBillCalculator from "@/components/ElectricityBillCalculator";
 import FourInsuranceCalculator from "@/components/FourInsuranceCalculator";
 import LoanInterestCalculator from "@/components/LoanInterestCalculator";
@@ -27,6 +28,7 @@ const CALCULATOR_COMPONENTS: Record<string, React.ComponentType> = {
   "age-calculator": AgeCalculator,
   "dday-calculator": DdayCalculator,
   "bmi-calculator": BmiCalculator,
+  "dsr-calculator": DsrCalculator,
   "electricity-bill-calculator": ElectricityBillCalculator,
   "four-insurance-calculator": FourInsuranceCalculator,
   "loan-interest-calculator": LoanInterestCalculator,
