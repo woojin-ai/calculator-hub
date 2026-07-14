@@ -46,7 +46,7 @@ export default function AgeCalculator() {
             value={birthDate}
             onChange={(event) => setBirthDate(event.target.value)}
             max={new Date().toISOString().slice(0, 10)}
-            className={`h-12 rounded-lg border px-4 text-base text-brand-text outline-none transition-colors focus:border-brand-primary focus:ring-4 focus:ring-brand-primary/15 ${
+            className={`h-12 rounded-lg border px-4 text-base text-brand-text outline-hidden transition-colors focus:border-brand-primary focus:ring-4 focus:ring-brand-primary/15 ${
               error ? "border-brand-warning" : "border-brand-border"
             }`}
           />

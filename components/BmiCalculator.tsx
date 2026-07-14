@@ -98,7 +98,7 @@ export default function BmiCalculator() {
               value={height}
               onChange={(event) => setHeight(event.target.value)}
               placeholder="170"
-              className={`h-12 rounded-lg border px-4 text-base text-brand-text outline-none transition-colors focus:border-brand-primary focus:ring-4 focus:ring-brand-primary/15 ${
+              className={`h-12 rounded-lg border px-4 text-base text-brand-text outline-hidden transition-colors focus:border-brand-primary focus:ring-4 focus:ring-brand-primary/15 ${
                 error ? "border-brand-warning" : "border-brand-border"
               }`}
             />
@@ -118,7 +118,7 @@ export default function BmiCalculator() {
               value={weight}
               onChange={(event) => setWeight(event.target.value)}
               placeholder="65"
-              className={`h-12 rounded-lg border px-4 text-base text-brand-text outline-none transition-colors focus:border-brand-primary focus:ring-4 focus:ring-brand-primary/15 ${
+              className={`h-12 rounded-lg border px-4 text-base text-brand-text outline-hidden transition-colors focus:border-brand-primary focus:ring-4 focus:ring-brand-primary/15 ${
                 error ? "border-brand-warning" : "border-brand-border"
               }`}
             />

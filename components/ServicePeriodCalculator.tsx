@@ -8,7 +8,7 @@ import {
 } from "@/lib/service-period";
 
 const inputBase =
-  "h-12 rounded-lg border px-4 text-base text-brand-text outline-none transition-colors focus:border-brand-primary focus:ring-4 focus:ring-brand-primary/15";
+  "h-12 rounded-lg border px-4 text-base text-brand-text outline-hidden transition-colors focus:border-brand-primary focus:ring-4 focus:ring-brand-primary/15";
 
 type FieldError = { field: "start" | "end"; message: string } | null;
 

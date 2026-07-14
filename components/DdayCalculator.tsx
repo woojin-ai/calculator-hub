@@ -49,7 +49,7 @@ export default function DdayCalculator() {
             type="date"
             value={targetDate}
             onChange={(event) => setTargetDate(event.target.value)}
-            className={`h-12 rounded-lg border px-4 text-base text-brand-text outline-none transition-colors focus:border-brand-primary focus:ring-4 focus:ring-brand-primary/15 ${
+            className={`h-12 rounded-lg border px-4 text-base text-brand-text outline-hidden transition-colors focus:border-brand-primary focus:ring-4 focus:ring-brand-primary/15 ${
               error ? "border-brand-warning" : "border-brand-border"
             }`}
           />
@@ -74,7 +74,7 @@ export default function DdayCalculator() {
               value={eventName}
               onChange={(event) => setEventName(event.target.value)}
               placeholder="예: 수능, 결혼기념일, 여행 출발일"
-              className="h-12 rounded-lg border border-brand-border px-4 text-base text-brand-text outline-none transition-colors focus:border-brand-primary focus:ring-4 focus:ring-brand-primary/15"
+              className="h-12 rounded-lg border border-brand-border px-4 text-base text-brand-text outline-hidden transition-colors focus:border-brand-primary focus:ring-4 focus:ring-brand-primary/15"
             />
           </div>
         ) : (

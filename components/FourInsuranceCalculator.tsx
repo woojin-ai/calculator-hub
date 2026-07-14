@@ -21,10 +21,10 @@ function formatAmountInput(raw: string): string {
 }
 
 const inputBase =
-  "h-12 rounded-lg border px-4 text-base text-brand-text outline-none transition-colors focus:border-brand-primary focus:ring-4 focus:ring-brand-primary/15";
+  "h-12 rounded-lg border px-4 text-base text-brand-text outline-hidden transition-colors focus:border-brand-primary focus:ring-4 focus:ring-brand-primary/15";
 
 const selectBase =
-  "h-12 w-full appearance-none rounded-lg border border-brand-border bg-white pl-4 pr-9 text-base text-brand-text outline-none transition-colors focus:border-brand-primary focus:ring-4 focus:ring-brand-primary/15";
+  "h-12 w-full appearance-none rounded-lg border border-brand-border bg-white pl-4 pr-9 text-base text-brand-text outline-hidden transition-colors focus:border-brand-primary focus:ring-4 focus:ring-brand-primary/15";
 
 /** 사업장 규모 옵션(값·표시 = 기획 §1-2 / 디자인 §2-2, 순서 고정). */
 const BUSINESS_SIZE_OPTIONS: { value: BusinessSize; label: string }[] = [

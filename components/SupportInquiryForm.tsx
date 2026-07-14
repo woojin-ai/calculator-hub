@@ -3,7 +3,7 @@
 import { useState, type FormEvent } from "react";
 
 const inputBase =
-  "h-12 rounded-lg border px-4 text-base text-brand-text outline-none transition-colors focus:border-brand-primary focus:ring-4 focus:ring-brand-primary/15";
+  "h-12 rounded-lg border px-4 text-base text-brand-text outline-hidden transition-colors focus:border-brand-primary focus:ring-4 focus:ring-brand-primary/15";
 
 interface FieldErrors {
   email?: string;
@@ -137,7 +137,7 @@ export default function SupportInquiryForm() {
           placeholder="사용하신 계산기 이름, 입력한 값, 문의 내용을 자세히 적어주시면 빠르게 확인할 수 있습니다."
           aria-invalid={errors.message ? true : undefined}
           disabled={status === "submitting"}
-          className={`min-h-[140px] rounded-lg border px-4 py-3 text-base text-brand-text outline-none transition-colors focus:border-brand-primary focus:ring-4 focus:ring-brand-primary/15 ${
+          className={`min-h-[140px] rounded-lg border px-4 py-3 text-base text-brand-text outline-hidden transition-colors focus:border-brand-primary focus:ring-4 focus:ring-brand-primary/15 ${
             errors.message ? "border-brand-warning" : "border-brand-border"
           } disabled:opacity-60`}
         />

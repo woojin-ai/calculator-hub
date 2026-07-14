@@ -15,10 +15,10 @@ import {
 } from "@/lib/units";
 
 const inputBase =
-  "h-12 min-w-0 rounded-lg border border-brand-border px-4 text-base text-brand-text outline-none transition-colors focus:border-brand-primary focus:ring-4 focus:ring-brand-primary/15";
+  "h-12 min-w-0 rounded-lg border border-brand-border px-4 text-base text-brand-text outline-hidden transition-colors focus:border-brand-primary focus:ring-4 focus:ring-brand-primary/15";
 
 const selectBase =
-  "h-12 min-w-0 appearance-none rounded-lg border border-brand-border bg-white pl-4 pr-9 text-base text-brand-text outline-none transition-colors focus:border-brand-primary focus:ring-4 focus:ring-brand-primary/15";
+  "h-12 min-w-0 appearance-none rounded-lg border border-brand-border bg-white pl-4 pr-9 text-base text-brand-text outline-hidden transition-colors focus:border-brand-primary focus:ring-4 focus:ring-brand-primary/15";
 
 /** 참조표 한 행(예: "10평" → "33.06㎡")의 입력 정의. 값은 항상 엔진(convert)으로 계산해
  * 해설/참조표 수치가 하드코딩 오탈자로 엔진값과 어긋나는 일(연봉 계산기 CS 전례)을 막는다. */
