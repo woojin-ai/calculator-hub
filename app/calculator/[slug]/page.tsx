@@ -23,6 +23,8 @@ import UnitConverter from "@/components/UnitConverter";
 import ResultInterpretation from "@/components/ResultInterpretation";
 import FaqAccordion from "@/components/FaqAccordion";
 import RelatedCalculators from "@/components/RelatedCalculators";
+import RelatedBlogPosts from "@/components/RelatedBlogPosts";
+import { getBlogPostsForCalculator } from "@/lib/blog";
 
 // slug별 실제 계산기 UI 컴포넌트 매핑 (아직 구현되지 않은 계산기는 매핑하지 않는다)
 const CALCULATOR_COMPONENTS: Record<string, React.ComponentType> = {
@@ -78,6 +80,7 @@ export default async function CalculatorPage({
 
   const CalculatorComponent = CALCULATOR_COMPONENTS[calculator.slug];
   const related = getRelatedCalculators(calculator.slug);
+  const relatedPosts = getBlogPostsForCalculator(calculator.slug);
   const jsonLd = buildCalculatorJsonLd(calculator);
 
   return (
@@ -129,6 +132,10 @@ export default async function CalculatorPage({
 
       {calculator.status === "live" && (
         <RelatedCalculators calculators={related} />
+      )}
+
+      {calculator.status === "live" && (
+        <RelatedBlogPosts posts={relatedPosts} />
       )}
     </div>
   );

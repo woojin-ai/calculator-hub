@@ -8,8 +8,15 @@ function formatPublishedDate(iso: string): string {
   return `${year}. ${month}. ${day}.`;
 }
 
-export default function BlogPostCard({ post }: { post: BlogPost }) {
+export default function BlogPostCard({
+  post,
+  headingLevel = "h2",
+}: {
+  post: BlogPost;
+  headingLevel?: "h2" | "h3";
+}) {
   const readingMinutes = getReadingTimeMinutes(post);
+  const HeadingTag = headingLevel;
 
   return (
     <Link
@@ -21,9 +28,9 @@ export default function BlogPostCard({ post }: { post: BlogPost }) {
           {categoryInfo[post.category].title}
         </span>
       </div>
-      <h2 className="line-clamp-2 text-base font-semibold text-brand-text group-hover:text-brand-primary sm:text-lg">
+      <HeadingTag className="line-clamp-2 text-base font-semibold text-brand-text group-hover:text-brand-primary sm:text-lg">
         {post.title}
-      </h2>
+      </HeadingTag>
       <p className="line-clamp-2 text-pretty text-xs leading-relaxed text-brand-text-secondary sm:text-sm">
         {post.description}
       </p>

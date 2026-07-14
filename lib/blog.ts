@@ -560,6 +560,18 @@ export function getBlogPostBySlug(slug: string): BlogPost | undefined {
   return blogPosts.find((p) => p.slug === slug);
 }
 
+/** 이 계산기 slug를 relatedCalculatorSlugs에 포함하는 글 목록. 발행일 내림차순, 동일 발행일이면 slug 오름차순(SSG 결정성), 최대 3편. */
+export function getBlogPostsForCalculator(calculatorSlug: string): BlogPost[] {
+  return blogPosts
+    .filter((p) => p.relatedCalculatorSlugs.includes(calculatorSlug))
+    .sort(
+      (a, b) =>
+        b.publishedDate.localeCompare(a.publishedDate) ||
+        a.slug.localeCompare(b.slug),
+    )
+    .slice(0, 3);
+}
+
 /** 본문 텍스트 길이 기반 예상 읽기 시간(분, 최소 1). 한국어 약 500자/분 가정 */
 export function getReadingTimeMinutes(post: BlogPost): number {
   const chars = post.body.reduce((sum, s) => {
