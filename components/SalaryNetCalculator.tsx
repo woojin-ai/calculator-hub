@@ -288,6 +288,11 @@ export default function SalaryNetCalculator() {
           >
             연봉 실수령액 계산하기
           </button>
+
+          <p className="mt-2 text-xs text-brand-text-secondary">
+            입력하신 연봉·비과세액 등은 브라우저 안에서만 계산되며 서버에
+            저장·전송되지 않습니다.
+          </p>
         </form>
 
         {result && (
