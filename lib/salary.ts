@@ -130,8 +130,11 @@ export interface SalaryResult {
 // 유틸
 // -----------------------------------------------------------------------------
 
-/** 천원 단위 절사 (국민연금 기준소득월액 계산용) */
-function floorTo1000(value: number): number {
+/**
+ * 천원 단위 절사 (국민연금 기준소득월액 계산용).
+ * 4대보험료 계산기(lib/four-insurance.ts)가 동일 라운딩을 공유하도록 export한다.
+ */
+export function floorTo1000(value: number): number {
   return Math.floor(value / 1000) * 1000;
 }
 
