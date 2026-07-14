@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 import { calculators } from "@/lib/calculators";
+import { blogPosts } from "@/lib/blog";
 import { SITE_URL } from "@/lib/site";
 
 export default function sitemap(): MetadataRoute.Sitemap {
@@ -65,5 +66,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.8,
     }));
 
-  return [...staticPages, ...liveCalculatorPages];
+  const blogPostPages: MetadataRoute.Sitemap = blogPosts.map((post) => ({
+    url: `${SITE_URL}/blog/${post.slug}`,
+    lastModified: post.updatedDate ?? post.publishedDate,
+    changeFrequency: "monthly",
+    priority: 0.6,
+  }));
+
+  return [...staticPages, ...liveCalculatorPages, ...blogPostPages];
 }
