@@ -147,9 +147,9 @@ export default function SalaryNetCalculator() {
           ⓘ
         </span>
         <p className="text-sm text-amber-900">
-          근로소득세는 국세청 간이세액표를 근사한 값으로 계산해, 실제
-          급여명세서·원천징수액과 다를 수 있습니다. 결과는 참고용으로만 활용해
-          주세요.
+          근로소득세는 국세청 간이세액표(회사가 매달 월급에서 세금을 뗄 때 쓰는
+          기준표)를 근사한 값으로 계산해, 실제 급여명세서·원천징수액과 다를 수
+          있습니다. 결과는 참고용으로만 활용해 주세요.
         </p>
       </div>
 
@@ -207,7 +207,8 @@ export default function SalaryNetCalculator() {
               className={`${inputBase} border-brand-border`}
             />
             <p className="text-xs text-brand-text-secondary">
-              식대는 월 20만원까지 비과세(기본값). 자가운전보조금 등 있으면 증액하세요.
+              비과세는 세금·4대 보험이 붙지 않는 급여입니다. 식대는 월 20만원까지
+              비과세(기본값)이며, 자가운전보조금 등이 있으면 증액하세요.
             </p>
           </div>
 
@@ -241,7 +242,7 @@ export default function SalaryNetCalculator() {
                 </span>
               </div>
               <p className="text-xs text-brand-text-secondary">
-                본인 포함 최소 1명. 간이세액표 공제대상 가족 수.
+                본인과 배우자·자녀·부모 등 부양하는 가족의 수입니다(본인 포함 최소 1명).
               </p>
             </div>
 
