@@ -572,6 +572,21 @@ export function getBlogPostsForCalculator(calculatorSlug: string): BlogPost[] {
     .slice(0, 3);
 }
 
+/** 상수: 카테고리 페이지 관련 글 최대 노출 수 */
+const CATEGORY_RELATED_BLOG_LIMIT = 6;
+
+/** 이 카테고리에 속한 블로그 글 목록. 발행일 내림차순, 동일 발행일이면 slug 오름차순(SSG 결정성), 최대 6편. */
+export function getBlogPostsByCategory(category: BlogCategory): BlogPost[] {
+  return blogPosts
+    .filter((p) => p.category === category)
+    .sort(
+      (a, b) =>
+        b.publishedDate.localeCompare(a.publishedDate) ||
+        a.slug.localeCompare(b.slug),
+    )
+    .slice(0, CATEGORY_RELATED_BLOG_LIMIT);
+}
+
 /** 본문 텍스트 길이 기반 예상 읽기 시간(분, 최소 1). 한국어 약 500자/분 가정 */
 export function getReadingTimeMinutes(post: BlogPost): number {
   const chars = post.body.reduce((sum, s) => {

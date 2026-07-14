@@ -4,6 +4,8 @@ import {
   type CalculatorCategory,
 } from "@/lib/calculators";
 import CalculatorCard from "@/components/CalculatorCard";
+import RelatedBlogPosts from "@/components/RelatedBlogPosts";
+import { getBlogPostsByCategory } from "@/lib/blog";
 import { buildCategoryJsonLd } from "@/lib/site-jsonld";
 
 export default function CategoryPage({
@@ -32,11 +34,18 @@ export default function CategoryPage({
         {info.description}
       </p>
 
-      <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {items.map((calculator) => (
-          <CalculatorCard key={calculator.slug} calculator={calculator} />
-        ))}
-      </div>
+      <section aria-labelledby="calc-list-heading">
+        <h2 id="calc-list-heading" className="sr-only">
+          계산기 목록
+        </h2>
+        <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {items.map((calculator) => (
+            <CalculatorCard key={calculator.slug} calculator={calculator} />
+          ))}
+        </div>
+      </section>
+
+      <RelatedBlogPosts posts={getBlogPostsByCategory(category)} />
     </div>
   );
 }
