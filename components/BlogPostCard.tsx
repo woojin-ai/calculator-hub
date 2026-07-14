@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { categoryInfo } from "@/lib/calculators";
 import { getReadingTimeMinutes, type BlogPost } from "@/lib/blog";
+import { FOCUS_RING_CARD } from "@/lib/focusRing";
 
 // 발행일 "YYYY-MM-DD" → "2026. 7. 15." 표기 (ko-KR).
 function formatPublishedDate(iso: string): string {
@@ -21,7 +22,7 @@ export default function BlogPostCard({
   return (
     <Link
       href={`/blog/${post.slug}`}
-      className="group flex flex-col gap-2 rounded-xl border border-brand-border bg-brand-surface p-4 transition-all hover:border-brand-primary hover:shadow-md"
+      className={`group flex flex-col gap-2 rounded-xl border border-brand-border bg-brand-surface p-4 transition-all hover:border-brand-primary hover:shadow-md ${FOCUS_RING_CARD}`}
     >
       <div className="flex">
         <span className="self-start rounded-full bg-brand-bg px-2 py-0.5 text-xs font-medium text-brand-text-secondary">

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { FOCUS_RING_LINK, FOCUS_RING_LINK_ROUNDED } from "@/lib/focusRing";
 
 const NAV_ITEMS = [
   { href: "/salary", label: "급여" },
@@ -15,7 +16,7 @@ export default function SiteHeader() {
       <div className="mx-auto flex h-16 max-w-5xl items-center gap-2 px-4 sm:px-6">
         <Link
           href="/"
-          className="shrink-0 text-lg font-bold tracking-tight text-brand-text"
+          className={`shrink-0 text-lg font-bold tracking-tight text-brand-text ${FOCUS_RING_LINK_ROUNDED}`}
         >
           계산기 허브
         </Link>
@@ -25,7 +26,7 @@ export default function SiteHeader() {
             <Link
               key={item.href}
               href={item.href}
-              className="rounded-md px-2 py-2 text-sm font-medium text-brand-text-secondary transition-colors hover:bg-brand-bg hover:text-brand-primary sm:px-3"
+              className={`rounded-md px-2 py-2 text-sm font-medium text-brand-text-secondary transition-colors hover:bg-brand-bg hover:text-brand-primary sm:px-3 ${FOCUS_RING_LINK}`}
             >
               {item.label}
             </Link>

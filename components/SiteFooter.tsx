@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { FOCUS_RING_LINK_ROUNDED } from "@/lib/focusRing";
 
 const FOOTER_LINKS = [
   { href: "/about", label: "사이트 소개" },
@@ -16,7 +17,7 @@ export default function SiteFooter() {
             <Link
               key={link.href}
               href={link.href}
-              className="py-2 transition-colors hover:text-brand-primary"
+              className={`py-2 transition-colors hover:text-brand-primary ${FOCUS_RING_LINK_ROUNDED}`}
             >
               {link.label}
             </Link>

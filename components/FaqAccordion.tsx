@@ -1,4 +1,5 @@
 import type { FaqItem } from "@/lib/calculators";
+import { FOCUS_RING_INSET } from "@/lib/focusRing";
 
 export default function FaqAccordion({ items }: { items: FaqItem[] }) {
   if (items.length === 0) return null;
@@ -9,7 +10,7 @@ export default function FaqAccordion({ items }: { items: FaqItem[] }) {
       <div className="divide-y divide-brand-border rounded-xl border border-brand-border bg-brand-surface">
         {items.map((item) => (
           <details key={item.question} className="group p-4">
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-sm font-semibold text-brand-text marker:content-none">
+            <summary className={`flex cursor-pointer list-none items-center justify-between gap-4 text-sm font-semibold text-brand-text marker:content-none ${FOCUS_RING_INSET}`}>
               {item.question}
               <span className="shrink-0 text-brand-text-secondary transition-transform group-open:rotate-180">
                 ⌄

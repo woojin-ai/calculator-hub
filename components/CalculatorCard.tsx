@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { CalculatorMeta } from "@/lib/calculators";
+import { FOCUS_RING_CARD } from "@/lib/focusRing";
 
 export default function CalculatorCard({
   calculator,
@@ -11,7 +12,7 @@ export default function CalculatorCard({
   return (
     <Link
       href={`/calculator/${calculator.slug}`}
-      className="group flex flex-col gap-2 rounded-xl border border-brand-border bg-brand-surface p-4 transition-all hover:border-brand-primary hover:shadow-md"
+      className={`group flex flex-col gap-2 rounded-xl border border-brand-border bg-brand-surface p-4 transition-all hover:border-brand-primary hover:shadow-md ${FOCUS_RING_CARD}`}
     >
       <div className="flex items-center justify-between">
         <h3 className="text-base font-semibold text-brand-text">
