@@ -32,6 +32,7 @@ import { calculateSeverance } from "../../lib/severance";
 import { calculateElectricity } from "../../lib/electricity";
 import { convert } from "../../lib/units";
 import { calculateSavingsInterest } from "../../lib/savings-interest";
+import { calculateCarTax } from "../../lib/car-tax";
 
 // -----------------------------------------------------------------------------
 // 미니 테스트 하네스 (프레임워크 없이 per-engine PASS 라인 + 총계)
@@ -628,6 +629,86 @@ suite("savings-interest", (t) => {
     false,
     "600개월 초과 → ok:false"
   );
+});
+
+// =============================================================================
+// 14) car-tax — 자동차세(본세·차령경감·교육세·연세액·정기분·연납)
+//     출처: planning/car-tax-design.md §3-2 워크드 예시 케이스 A/B/C (마스터 확정).
+//     라운딩: baseTax 먼저 정수화 후 교육세·할인·연세액 파생(Tier 정합).
+// =============================================================================
+
+suite("car-tax", (t) => {
+  // 케이스 A: 2,000cc · 2020등록 · 내연 (1,600cc 초과 200원/cc, 차령 6년 20% 경감)
+  const a = calculateCarTax({ kind: "combustion", cc: 2000, registerYear: 2020 });
+  assert.ok(a.ok, "CAR-A ok");
+  if (a.ok) {
+    t.eq(a.amounts.baseTaxRaw, 400_000, "A 본세(경감 전) 2000×200");
+    t.eq(a.amounts.carAge, 6, "A 차령 6년");
+    t.eq(a.amounts.reliefRate, 0.2, "A 경감률 20%");
+    t.eq(a.amounts.baseTax, 320_000, "A 본세(경감 후)");
+    t.eq(a.amounts.educationTax, 96_000, "A 지방교육세(30%)");
+    t.eq(a.amounts.annualTotal, 416_000, "A 연세액 총액(Tier①)");
+    t.eq(a.amounts.semiAnnual, 208_000, "A 정기분 각 회차");
+    t.eq(a.amounts.prepayDiscount, 9_600, "A 연납 할인액(본세 3%)");
+    t.eq(a.amounts.prepayTotal, 406_400, "A 연납 납부액");
+  }
+
+  // 케이스 B: 전기·수소차 · 2023등록 (정액 10만, 경감 없음)
+  const b = calculateCarTax({ kind: "eco", cc: 0, registerYear: 2023 });
+  assert.ok(b.ok, "CAR-B ok");
+  if (b.ok) {
+    t.eq(b.amounts.baseTax, 100_000, "B 본세 정액 10만");
+    t.eq(b.amounts.reliefRate, 0, "B eco 경감 없음");
+    t.eq(b.amounts.educationTax, 30_000, "B 교육세 3만");
+    t.eq(b.amounts.annualTotal, 130_000, "B 연세액 총액");
+    t.eq(b.amounts.semiAnnual, 65_000, "B 정기분 각 65,000");
+    t.eq(b.amounts.prepayDiscount, 3_000, "B 연납 할인 3,000");
+    t.eq(b.amounts.prepayTotal, 127_000, "B 연납 납부액");
+  }
+
+  // 케이스 C: 1,600cc · 2010등록 · 내연 (경감 상한 50%, 1,600cc는 140원/cc 구간)
+  const c = calculateCarTax({ kind: "combustion", cc: 1600, registerYear: 2010 });
+  assert.ok(c.ok, "CAR-C ok");
+  if (c.ok) {
+    t.eq(c.amounts.baseTaxRaw, 224_000, "C 본세(경감 전) 1600×140");
+    t.eq(c.amounts.reliefRate, 0.5, "C 경감률 상한 50%");
+    t.eq(c.amounts.baseTax, 112_000, "C 본세(경감 후)");
+    t.eq(c.amounts.annualTotal, 145_600, "C 연세액 총액");
+  }
+
+  // 경계값: 1,600cc → 140원/cc, 1,601cc → 200원/cc (cc<=maxCc 순차 매칭)
+  const edge1600 = calculateCarTax({ kind: "combustion", cc: 1600, registerYear: 2026 });
+  const edge1601 = calculateCarTax({ kind: "combustion", cc: 1601, registerYear: 2026 });
+  assert.ok(edge1600.ok && edge1601.ok, "경계 ok");
+  if (edge1600.ok) t.eq(edge1600.amounts.baseTaxRaw, 224_000, "1600cc → 140원/cc");
+  if (edge1601.ok) t.eq(edge1601.amounts.baseTaxRaw, 320_200, "1601cc → 200원/cc");
+
+  // 차령<3 → 경감 0% (2024등록=차령2, 2026등록=차령0)
+  const age2 = calculateCarTax({ kind: "combustion", cc: 2000, registerYear: 2024 });
+  const age0 = calculateCarTax({ kind: "combustion", cc: 2000, registerYear: 2026 });
+  assert.ok(age2.ok && age0.ok, "차령<3 ok");
+  if (age2.ok) t.eq(age2.amounts.reliefRate, 0, "차령 2년 → 경감 0");
+  if (age0.ok) {
+    t.eq(age0.amounts.reliefRate, 0, "차령 0년 → 경감 0");
+    t.eq(age0.amounts.baseTax, 400_000, "차령 0년 본세=경감 전");
+  }
+
+  // 방어: 배기량 정수 1~9,999 밖 → invalid-cc
+  t.eq(calculateCarTax({ kind: "combustion", cc: 0, registerYear: 2020 }).ok, false, "cc 0 → invalid-cc");
+  t.eq(calculateCarTax({ kind: "combustion", cc: -100, registerYear: 2020 }).ok, false, "cc 음수 → invalid-cc");
+  t.eq(calculateCarTax({ kind: "combustion", cc: 1999.5, registerYear: 2020 }).ok, false, "cc 소수 → invalid-cc");
+  t.eq(calculateCarTax({ kind: "combustion", cc: 10000, registerYear: 2020 }).ok, false, "cc 9,999 초과 → invalid-cc");
+  const badCc = calculateCarTax({ kind: "combustion", cc: 0, registerYear: 2020 });
+  t.eq(badCc.ok === false && badCc.error, "invalid-cc", "cc 에러코드 invalid-cc");
+
+  // 방어: 등록연도 정수 1900~2026 밖 or 비정수 → invalid-year
+  t.eq(calculateCarTax({ kind: "combustion", cc: 2000, registerYear: 1899 }).ok, false, "연도 1900 미만 → invalid-year");
+  t.eq(calculateCarTax({ kind: "combustion", cc: 2000, registerYear: 2027 }).ok, false, "연도 2026 초과 → invalid-year");
+  t.eq(calculateCarTax({ kind: "combustion", cc: 2000, registerYear: 2020.5 }).ok, false, "연도 비정수 → invalid-year");
+  const badYear = calculateCarTax({ kind: "combustion", cc: 2000, registerYear: 2027 });
+  t.eq(badYear.ok === false && badYear.error, "invalid-year", "연도 에러코드 invalid-year");
+  // eco도 등록연도 방어는 동일 적용(배기량은 무시)
+  t.eq(calculateCarTax({ kind: "eco", cc: 0, registerYear: 2027 }).ok, false, "eco 연도 초과 → invalid-year");
 });
 
 // -----------------------------------------------------------------------------

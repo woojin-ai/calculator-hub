@@ -11,6 +11,7 @@ import { buildCalculatorJsonLd } from "@/lib/calculator-jsonld";
 import AgeCalculator from "@/components/AgeCalculator";
 import DdayCalculator from "@/components/DdayCalculator";
 import BmiCalculator from "@/components/BmiCalculator";
+import CarTaxCalculator from "@/components/CarTaxCalculator";
 import DsrCalculator from "@/components/DsrCalculator";
 import ElectricityBillCalculator from "@/components/ElectricityBillCalculator";
 import FourInsuranceCalculator from "@/components/FourInsuranceCalculator";
@@ -33,6 +34,7 @@ const CALCULATOR_COMPONENTS: Record<string, React.ComponentType> = {
   "age-calculator": AgeCalculator,
   "dday-calculator": DdayCalculator,
   "bmi-calculator": BmiCalculator,
+  "car-tax-calculator": CarTaxCalculator,
   "dsr-calculator": DsrCalculator,
   "electricity-bill-calculator": ElectricityBillCalculator,
   "four-insurance-calculator": FourInsuranceCalculator,
