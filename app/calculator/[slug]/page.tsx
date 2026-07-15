@@ -9,6 +9,7 @@ import {
 } from "@/lib/calculators";
 import { buildCalculatorJsonLd } from "@/lib/calculator-jsonld";
 import AgeCalculator from "@/components/AgeCalculator";
+import AnnualLeaveAllowanceCalculator from "@/components/AnnualLeaveAllowanceCalculator";
 import DdayCalculator from "@/components/DdayCalculator";
 import BmiCalculator from "@/components/BmiCalculator";
 import CarTaxCalculator from "@/components/CarTaxCalculator";
@@ -32,6 +33,7 @@ import { getBlogPostsForCalculator } from "@/lib/blog";
 // slug별 실제 계산기 UI 컴포넌트 매핑 (아직 구현되지 않은 계산기는 매핑하지 않는다)
 const CALCULATOR_COMPONENTS: Record<string, React.ComponentType> = {
   "age-calculator": AgeCalculator,
+  "annual-leave-allowance-calculator": AnnualLeaveAllowanceCalculator,
   "dday-calculator": DdayCalculator,
   "bmi-calculator": BmiCalculator,
   "car-tax-calculator": CarTaxCalculator,
