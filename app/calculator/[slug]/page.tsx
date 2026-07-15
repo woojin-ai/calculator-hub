@@ -20,6 +20,7 @@ import SalaryNetCalculator from "@/components/SalaryNetCalculator";
 import ServicePeriodCalculator from "@/components/ServicePeriodCalculator";
 import SeverancePayCalculator from "@/components/SeverancePayCalculator";
 import UnitConverter from "@/components/UnitConverter";
+import WeeklyHolidayAllowanceCalculator from "@/components/WeeklyHolidayAllowanceCalculator";
 import ResultInterpretation from "@/components/ResultInterpretation";
 import FaqAccordion from "@/components/FaqAccordion";
 import RelatedCalculators from "@/components/RelatedCalculators";
@@ -40,6 +41,7 @@ const CALCULATOR_COMPONENTS: Record<string, React.ComponentType> = {
   "service-period-calculator": ServicePeriodCalculator,
   "severance-pay-calculator": SeverancePayCalculator,
   "unit-converter": UnitConverter,
+  "weekly-holiday-allowance-calculator": WeeklyHolidayAllowanceCalculator,
 };
 
 export function generateStaticParams() {
