@@ -31,6 +31,7 @@ import { calculateServicePeriod } from "../../lib/service-period";
 import { calculateSeverance } from "../../lib/severance";
 import { calculateElectricity } from "../../lib/electricity";
 import { convert } from "../../lib/units";
+import { calculateSavingsInterest } from "../../lib/savings-interest";
 
 // -----------------------------------------------------------------------------
 // 미니 테스트 하네스 (프레임워크 없이 per-engine PASS 라인 + 총계)
@@ -516,6 +517,117 @@ suite("units", (t) => {
   // 계약: 잘못된 단위 id / NaN → null
   t.eq(convert(1, "bad", "cm", "length"), null, "잘못된 단위 → null");
   t.eq(convert(NaN, "cm", "inch", "length"), null, "NaN → null");
+});
+
+// =============================================================================
+// 13) savings-interest — 적금·예금 이자(세전·과세·세후수령·실효수익률)
+//     출처: planning/savings-interest-design.md §3-5 + 마스터 확정 검산(예금 앵커).
+//     라운딩: 내부 전정밀도, 표시값 원단위 반올림, Tier② 행 정합(세후이자=세전-과세).
+// =============================================================================
+
+suite("savings-interest", (t) => {
+  // 앵커(마스터 확정): 예금 1,000만·3.5%·12개월·단리·일반과세
+  const dep = calculateSavingsInterest({
+    principalOrMonthly: 10_000_000,
+    months: 12,
+    annualRate: 3.5,
+    mode: "deposit",
+    method: "simple",
+    taxType: "general",
+  });
+  assert.ok(dep.ok, "SAV-예금 ok");
+  if (dep.ok) {
+    t.eq(dep.amounts.pretaxInterest, 350_000, "예금 세전이자");
+    t.eq(dep.amounts.taxAmount, 53_900, "예금 이자과세(15.4%)");
+    t.eq(dep.amounts.afterTaxInterest, 296_100, "예금 세후이자");
+    t.eq(dep.amounts.afterTaxReceived, 10_296_100, "예금 세후 수령액");
+    t.eq(dep.amounts.effectiveRatePercent, 2.96, "예금 실효수익률 2.96%");
+  }
+
+  // 적금 월 50만·3.5%·12개월·단리·일반과세 (n(n+1)/2 가중 검증)
+  const ins = calculateSavingsInterest({
+    principalOrMonthly: 500_000,
+    months: 12,
+    annualRate: 3.5,
+    mode: "installment",
+    method: "simple",
+    taxType: "general",
+  });
+  assert.ok(ins.ok, "SAV-적금 ok");
+  if (ins.ok) {
+    t.eq(ins.amounts.principalTotal, 6_000_000, "적금 총납입원금");
+    t.eq(ins.amounts.pretaxInterest, 113_750, "적금 세전이자(가중)");
+    t.eq(ins.amounts.taxAmount, 17_518, "적금 이자과세");
+    t.eq(ins.amounts.afterTaxInterest, 96_232, "적금 세후이자(=세전-과세, 정합)");
+    t.eq(ins.amounts.afterTaxReceived, 6_096_232, "적금 세후 수령액");
+  }
+
+  // 월복리 > 단리 (예금 1,000만·3.5%·12개월·일반과세)
+  const cmp = calculateSavingsInterest({
+    principalOrMonthly: 10_000_000,
+    months: 12,
+    annualRate: 3.5,
+    mode: "deposit",
+    method: "monthlyCompound",
+    taxType: "general",
+  });
+  assert.ok(cmp.ok, "SAV-월복리 ok");
+  if (cmp.ok) {
+    t.eq(cmp.amounts.pretaxInterest, 355_670, "예금 월복리 세전이자");
+    t.ok(cmp.amounts.pretaxInterest > 350_000, "월복리 > 단리");
+  }
+
+  // 비과세: 세금 0, 세후이자=세전이자
+  const free = calculateSavingsInterest({
+    principalOrMonthly: 500_000,
+    months: 24,
+    annualRate: 4,
+    mode: "installment",
+    method: "simple",
+    taxType: "taxFree",
+  });
+  assert.ok(free.ok, "SAV-비과세 ok");
+  if (free.ok) {
+    t.eq(free.amounts.taxAmount, 0, "비과세 과세 0");
+    t.eq(free.amounts.afterTaxInterest, free.amounts.pretaxInterest, "비과세 세후=세전");
+  }
+
+  // 엣지: 연이율 0% → 이자 0, 세후수령=원금 (게이트 아님, 정상 결과)
+  const zero = calculateSavingsInterest({
+    principalOrMonthly: 10_000_000,
+    months: 12,
+    annualRate: 0,
+    mode: "deposit",
+    method: "monthlyCompound",
+    taxType: "general",
+  });
+  assert.ok(zero.ok, "SAV-0% ok");
+  if (zero.ok) {
+    t.eq(zero.amounts.pretaxInterest, 0, "0% 세전이자 0");
+    t.eq(zero.amounts.afterTaxReceived, 10_000_000, "0% 세후수령=원금");
+  }
+
+  // 계약: 무효 입력 → ok:false 판별 유니온
+  t.eq(
+    calculateSavingsInterest({ principalOrMonthly: 0, months: 12, annualRate: 3.5, mode: "deposit", method: "simple", taxType: "general" }).ok,
+    false,
+    "금액 0 → ok:false"
+  );
+  t.eq(
+    calculateSavingsInterest({ principalOrMonthly: 100, months: 12.5, annualRate: 3.5, mode: "deposit", method: "simple", taxType: "general" }).ok,
+    false,
+    "비정수 개월 → ok:false"
+  );
+  t.eq(
+    calculateSavingsInterest({ principalOrMonthly: 100, months: 12, annualRate: -1, mode: "deposit", method: "simple", taxType: "general" }).ok,
+    false,
+    "음수 이율 → ok:false"
+  );
+  t.eq(
+    calculateSavingsInterest({ principalOrMonthly: 100, months: 601, annualRate: 3.5, mode: "deposit", method: "simple", taxType: "general" }).ok,
+    false,
+    "600개월 초과 → ok:false"
+  );
 });
 
 // -----------------------------------------------------------------------------

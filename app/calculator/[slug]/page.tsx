@@ -17,6 +17,7 @@ import FourInsuranceCalculator from "@/components/FourInsuranceCalculator";
 import LoanInterestCalculator from "@/components/LoanInterestCalculator";
 import LoanPrepaymentFeeCalculator from "@/components/LoanPrepaymentFeeCalculator";
 import SalaryNetCalculator from "@/components/SalaryNetCalculator";
+import SavingsInterestCalculator from "@/components/SavingsInterestCalculator";
 import ServicePeriodCalculator from "@/components/ServicePeriodCalculator";
 import SeverancePayCalculator from "@/components/SeverancePayCalculator";
 import UnitConverter from "@/components/UnitConverter";
@@ -38,6 +39,7 @@ const CALCULATOR_COMPONENTS: Record<string, React.ComponentType> = {
   "loan-interest-calculator": LoanInterestCalculator,
   "loan-prepayment-fee": LoanPrepaymentFeeCalculator,
   "salary-net-calculator": SalaryNetCalculator,
+  "savings-interest-calculator": SavingsInterestCalculator,
   "service-period-calculator": ServicePeriodCalculator,
   "severance-pay-calculator": SeverancePayCalculator,
   "unit-converter": UnitConverter,
