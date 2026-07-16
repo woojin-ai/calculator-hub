@@ -10,6 +10,7 @@ import {
   AGE_RELIEF_START_YEAR,
   AGE_RELIEF_PER_YEAR,
   AGE_RELIEF_MAX,
+  CAR_TAX_BASE_YEAR,
   type CarKind,
   type CarTaxAmounts,
   type CarTaxInput,
@@ -167,9 +168,9 @@ export default function CarTaxCalculator() {
       !Number.isFinite(yearNum) ||
       !Number.isInteger(yearNum) ||
       yearNum < 1900 ||
-      yearNum > 2026
+      yearNum > CAR_TAX_BASE_YEAR
     ) {
-      nextErrors.year = "최초등록연도를 1900~2026 사이로 입력해주세요.";
+      nextErrors.year = `최초등록연도를 1900~${CAR_TAX_BASE_YEAR} 사이로 입력해주세요.`;
     }
 
     if (Object.keys(nextErrors).length > 0) {
@@ -189,7 +190,7 @@ export default function CarTaxCalculator() {
       setErrors(
         outcome.error === "invalid-cc"
           ? { cc: "배기량을 cc 단위 정수로 입력해주세요." }
-          : { year: "최초등록연도를 1900~2026 사이로 입력해주세요." }
+          : { year: `최초등록연도를 1900~${CAR_TAX_BASE_YEAR} 사이로 입력해주세요.` }
       );
       setResult(null);
       return;
