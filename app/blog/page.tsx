@@ -62,7 +62,7 @@ export default async function BlogPage({
   if (requestedPage > totalPages) notFound();
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-12">
+    <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-12">
       <h1 className="text-2xl font-bold text-brand-text sm:text-[2rem]">
         블로그
       </h1>
