@@ -3611,3 +3611,35 @@ export function getReadingTimeMinutes(post: BlogPost): number {
   }, 0);
   return Math.max(1, Math.round(chars / 500));
 }
+
+/** 블로그 목록 페이지당 글 개수 (design/blog-pagination-search-ui-spec.md §2-1) */
+export const BLOG_PAGE_SIZE = 9;
+
+/**
+ * 블로그 목록/검색용 경량 데이터. 본문(body)을 포함하지 않아 클라이언트로
+ * 안전하게 보낼 수 있다(§3-1). 읽는 시간은 body 기준으로 서버에서 미리 계산해
+ * 저장해 둔다 — BlogPostCard가 더 이상 getReadingTimeMinutes(post.body)를
+ * 직접 호출하지 않게 하기 위함(§3-2 데이터 계약 이슈, 옵션 A).
+ */
+export interface BlogListItem {
+  slug: string;
+  title: string;
+  description: string;
+  category: BlogCategory;
+  publishedDate: string;
+  readingMinutes: number;
+  tags: string[];
+}
+
+/** BlogPost[] → BlogListItem[] 변환(읽는 시간 미리 계산). 목록/검색/카드 렌더용 경량 데이터 생성. */
+export function toBlogListItems(posts: BlogPost[]): BlogListItem[] {
+  return posts.map((post) => ({
+    slug: post.slug,
+    title: post.title,
+    description: post.description,
+    category: post.category,
+    publishedDate: post.publishedDate,
+    readingMinutes: getReadingTimeMinutes(post),
+    tags: post.tags,
+  }));
+}

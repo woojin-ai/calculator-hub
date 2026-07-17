@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { categoryInfo } from "@/lib/calculators";
-import { getReadingTimeMinutes, type BlogPost } from "@/lib/blog";
+import type { BlogListItem } from "@/lib/blog";
 import { FOCUS_RING_CARD } from "@/lib/focusRing";
 
 // 발행일 "YYYY-MM-DD" → "2026. 7. 15." 표기 (ko-KR).
@@ -13,10 +13,9 @@ export default function BlogPostCard({
   post,
   headingLevel = "h2",
 }: {
-  post: BlogPost;
+  post: BlogListItem;
   headingLevel?: "h2" | "h3";
 }) {
-  const readingMinutes = getReadingTimeMinutes(post);
   const HeadingTag = headingLevel;
 
   return (
@@ -40,7 +39,7 @@ export default function BlogPostCard({
           {formatPublishedDate(post.publishedDate)}
         </time>
         <span aria-hidden="true">·</span>
-        <span>읽는 시간 {readingMinutes}분</span>
+        <span>읽는 시간 {post.readingMinutes}분</span>
       </div>
     </Link>
   );
