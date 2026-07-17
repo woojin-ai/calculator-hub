@@ -65,11 +65,11 @@ export const CROSS_SITE_LINKS: CrossSiteLink[] = [
     id: "loan-compare",
     name: "대출모아",
     shortLabel: "대출모아",
-    description: "대출·금융·보험 비교 블로그",
-    url: null, // 배포 후 값 채우면 자동으로 활성 링크로 전환됨(§8)
+    description: "대출·보험·예적금 비교",
+    url: "https://loan-compare-ten.vercel.app",
     initial: "대",
     badgeBg: "bg-brand-bg",
     badgeText: "text-brand-text-secondary",
-    status: "coming-soon",
+    status: "live",
   },
 ];
