@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import SiteHeader from "@/components/SiteHeader";
 import SiteFooter from "@/components/SiteFooter";
+import CrossSiteNav from "@/components/CrossSiteNav";
 import { buildSiteJsonLd } from "@/lib/site-jsonld";
 
 const geistSans = Geist({
@@ -68,6 +69,12 @@ export default function RootLayout({
         <SiteHeader />
         <main className="flex-1">{children}</main>
         <SiteFooter />
+        {/*
+          탭 순서상 본문+푸터 다음에 마운트(design/cross-site-nav-widget-spec.md §9).
+          position: fixed라 시각적 위치는 DOM 순서와 무관하지만, 키보드 사용자가
+          매 페이지에서 실제 콘텐츠보다 이 위젯을 먼저 지나치지 않도록 마지막에 둔다.
+        */}
+        <CrossSiteNav currentSiteId="calculator-hub" />
       </body>
     </html>
   );

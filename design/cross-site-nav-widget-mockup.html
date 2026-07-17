@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>크로스 사이트 내비게이션 위젯 — 정적 목업 (design/cross-site-nav-widget-spec.md)</title>
+<style>
+  /* ==========================================================
+     계산기 허브 design-system.md 토큰 (globals.css의 --color-brand-* 그대로)
+     ========================================================== */
+  :root {
+    --primary: #2563eb;
+    --primary-hover: #1d4ed8;
+    --accent: #10b981;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+    --bg: #f9fafb;
+    --surface: #ffffff;
+    --border: #e5e7eb;
+    --text: #111827;
+    --text-secondary: #6b7280;
+    --text-disabled: #d1d5db;
+
+    /* 배지 색 (design/cross-site-nav-widget-spec.md §3, raw Tailwind 팔레트) */
+    --blue-50: #eff6ff;
+    --blue-100: #dbeafe;
+    --violet-100: #ede9fe;
+    --violet-700: #6d28d9;
+    --teal-100: #ccfbf1;
+    --teal-700: #0f766e;
+
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+    /* 참고: 실제 사이트는 next/font의 Geist를 쓰지만, 이 목업은 의존성 없는 시스템 폰트로 근사했다.
+       레이아웃/치수 확인용이며 타이포그래피 픽셀 정합용이 아니다. */
+  }
+
+  /* ==========================================================
+     0. 목업 전용 안내 배너 (실제 위젯의 일부 아님 — 페이지 맨 위, 일반 흐름 안)
+     ========================================================== */
+  .dev-note {
+    border-bottom: 2px dashed var(--warning);
+    background: #fffbeb;
+    color: #92400e;
+    font-size: 13px;
+    line-height: 1.6;
+    padding: 12px 16px;
+  }
+  .dev-note b { font-weight: 700; }
+  .dev-note code { background: #fef3c7; padding: 1px 4px; border-radius: 4px; }
+
+  /* 현재 브레이크포인트 표시 (진단용, 실제 위젯 아님)
+     좌하단 고정 — 상단은 .dev-note 안내 배너와 겹칠 수 있고, 우측(레일)·우하단(FAB)은
+     실제 위젯이 쓰는 자리라 피했다. 좌하단은 모든 폭에서 비어 있는 자리. */
+  .mode-indicator {
+    position: fixed;
+    bottom: 8px;
+    left: 8px;
+    z-index: 50;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: var(--text);
+    color: #fff;
+    opacity: 0.85;
+  }
+  .mode-indicator .mobile-label { display: inline; }
+  .mode-indicator .desktop-label { display: none; }
+  @media (min-width: 1280px) {
+    .mode-indicator .mobile-label { display: none; }
+    .mode-indicator .desktop-label { display: inline; }
+  }
+
+  /* ==========================================================
+     1. 가짜 페이지 (헤더 + 계산기 카드 + 필러) — 실제 사이트 근사
+     ========================================================== */
+  .fake-header {
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+  .fake-header__inner {
+    max-width: 1024px; /* max-w-5xl */
+    margin: 0 auto;
+    height: 64px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 0 24px;
+  }
+  .fake-header__logo { font-weight: 700; font-size: 18px; }
+  .fake-header__nav { margin-left: auto; display: flex; gap: 16px; font-size: 14px; color: var(--text-secondary); }
+
+  main {
+    max-width: 1024px; /* max-w-5xl — 사이트에서 가장 넓은 컨테이너(§1-1) 기준으로 충돌 검증 */
+    margin: 0 auto;
+    padding: 40px 24px 96px;
+  }
+  h1 { font-size: 32px; margin: 0 0 8px; }
+  .subtitle { color: var(--text-secondary); margin: 0 0 32px; }
+
+  .calc-card {
+    border: 1px solid var(--border);
+    background: var(--surface);
+    border-radius: 12px;
+    padding: 24px;
+  }
+  .field { margin-bottom: 16px; }
+  .field label { display: block; font-size: 14px; font-weight: 500; color: var(--text-secondary); margin-bottom: 6px; }
+  .field input {
+    width: 100%;
+    height: 48px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0 16px;
+    font-size: 16px;
+  }
+  .field input:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgb(37 99 235 / 0.15);
+  }
+  .calc-submit {
+    width: 100%;
+    height: 48px;
+    border: none;
+    border-radius: 8px;
+    background: var(--primary);
+    color: #fff;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .calc-submit:hover { background: var(--primary-hover); }
+
+  .result-box {
+    margin-top: 24px;
+    border-left: 4px solid var(--accent);
+    background: linear-gradient(to bottom right, #ecfdf5, #fff);
+    border-radius: 12px;
+    padding: 20px;
+  }
+  .result-box .label { font-size: 14px; color: var(--text-secondary); }
+  .result-box .value { font-size: 36px; font-weight: 700; color: var(--accent); margin: 4px 0; }
+
+  .filler-section { margin-top: 40px; }
+  .filler-section h2 { font-size: 20px; }
+  .filler-block {
+    border: 1px solid var(--border);
+    background: var(--surface);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 8px;
+    color: var(--text-secondary);
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  .fake-footer {
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+    padding: 32px 24px;
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 13px;
+  }
+
+  /* ==========================================================
+     2. 데스크톱 레일 — design/cross-site-nav-widget-spec.md §4-3
+     xl(1280px) 이상에서만 노출. 위치는 뷰포트 기준(컨테이너 기준 아님)
+     ========================================================== */
+  .cross-site-rail {
+    display: none;
+    position: fixed;
+    right: 1rem; /* 16px */
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 40;
+    width: 5rem; /* 80px */
+    max-height: 80vh;
+    overflow-y: auto;
+    flex-direction: column;
+    gap: 0.25rem;
+    border-radius: 1rem;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    box-shadow: var(--shadow-md);
+    padding: 0.5rem;
+  }
+  @media (min-width: 1280px) {
+    .cross-site-rail { display: flex; }
+  }
+  .cross-site-rail__eyebrow {
+    width: 100%;
+    margin: 0 0 4px;
+    padding: 0 4px;
+    text-align: center;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    box-sizing: border-box;
+  }
+  .cross-site-rail__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.25rem; }
+
+  .rail-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    width: 4rem; /* 64px */
+    padding: 0.5rem 0.25rem;
+    border-radius: 0.75rem;
+    border: 1px solid transparent;
+    text-align: center;
+    text-decoration: none;
+    color: inherit;
+    transition: background-color 0.15s, border-color 0.15s;
+  }
+  a.rail-item:hover { background: var(--bg); border-color: var(--border); }
+  a.rail-item:focus-visible {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 4px rgb(37 99 235 / 0.15);
+  }
+  .rail-item--current { background: var(--blue-50); }
+  .rail-item--soon { opacity: 0.7; }
+
+  .badge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem; /* 32px */
+    height: 2rem;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+  }
+  .badge--blue { background: var(--blue-100); color: var(--primary); }
+  .badge--violet { background: var(--violet-100); color: var(--violet-700); }
+  .badge--teal { background: var(--teal-100); color: var(--teal-700); }
+  .badge--muted { background: var(--bg); color: var(--text-secondary); }
+
+  .rail-label {
+    width: 100%; /* 부모(.rail-item, flex+align-items:center)는 자식을 자동으로 줄바꿈 폭에
+                    맞춰주지 않는다 — 명시적으로 100%를 줘야 컬럼 폭(56px 안쪽)에서 줄바꿈됨 */
+    font-size: 11px;
+    line-height: 1.2;
+    font-weight: 500;
+    color: var(--text-secondary);
+    word-break: keep-all; /* 한글 단어(어절) 중간이 아니라 띄어쓰기 기준으로만 줄바꿈 */
+    overflow-wrap: break-word; /* 그래도 한 어절이 폭보다 길면 최후 수단으로 강제 줄바꿈 */
+  }
+  a.rail-item:hover .rail-label { color: var(--primary); }
+  .rail-label--current { font-weight: 600; color: var(--primary); }
+  .rail-label--soon { color: var(--text-disabled); }
+  .rail-tag { width: 100%; font-size: 9px; color: var(--text-secondary); }
+  .rail-tag--soon { color: var(--text-disabled); }
+
+  /* ==========================================================
+     3. 모바일 FAB — design/cross-site-nav-widget-spec.md §5-2
+     1280px 미만에서만 노출
+     ========================================================== */
+  .cross-site-fab-wrap {
+    display: block;
+    position: fixed;
+    right: 1rem;
+    bottom: 1rem;
+    bottom: max(1rem, env(safe-area-inset-bottom));
+    z-index: 40;
+  }
+  @media (min-width: 1280px) {
+    .cross-site-fab-wrap { display: none; }
+  }
+
+  .cross-site-fab { position: relative; }
+  .cross-site-fab summary {
+    list-style: none;
+    width: 3.5rem; /* 56px */
+    height: 3.5rem;
+    border-radius: 999px;
+    background: var(--primary);
+    box-shadow: var(--shadow-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: opacity 0.15s, transform 0.1s;
+  }
+  .cross-site-fab summary::-webkit-details-marker { display: none; }
+  .cross-site-fab summary:active { transform: scale(0.96); }
+  .cross-site-fab summary:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 4px rgb(37 99 235 / 0.3);
+  }
+  .fab-dots { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; }
+  .fab-dots span { width: 6px; height: 6px; border-radius: 999px; background: #fff; }
+
+  .fab-panel {
+    position: absolute;
+    right: 0;
+    bottom: calc(100% + 0.75rem);
+    width: 16rem; /* 256px */
+    max-width: calc(100vw - 2rem);
+    max-height: 70vh;
+    overflow-y: auto;
+    border-radius: 1rem;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    box-shadow: var(--shadow-md);
+    padding: 0.5rem;
+  }
+  .fab-panel__eyebrow { margin: 4px 8px 4px; font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+  .fab-panel__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+
+  .panel-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-radius: 0.75rem;
+    padding: 0.625rem 0.5rem;
+    text-decoration: none;
+    color: inherit;
+  }
+  a.panel-row:hover { background: var(--bg); }
+  a.panel-row:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--primary); border-radius: 0.75rem; }
+  .panel-row--current { background: var(--blue-50); }
+  .panel-row--soon { opacity: 0.7; }
+
+  .panel-badge { width: 2.25rem; height: 2.25rem; font-size: 13px; flex-shrink: 0; }
+  /* flex:1 1 auto + min-width:0은 row 방향 flex에서 텍스트 칼럼이 남는 폭을 채우면서도
+     내용이 배지를 밀어내며 넘치지 않게(=ellipsis가 실제로 동작하게) 하는 표준 처방 */
+  .panel-text { display: flex; flex: 1 1 auto; flex-direction: column; min-width: 0; }
+  .panel-name {
+    font-size: 14px; font-weight: 600; color: var(--text);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .panel-name--current { color: var(--primary); }
+  .panel-name--soon { color: var(--text-disabled); }
+  .panel-desc {
+    font-size: 12px; color: var(--text-secondary);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .panel-desc--soon { color: var(--text-disabled); }
+  .sr-only {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+  }
+
+  /* ==========================================================
+     4. §5-3 핵심 데모 — 입력 필드 포커스 시 FAB 자동 숨김 (JS 없음, :has()만)
+     ========================================================== */
+  body:has(.demo-input:focus) .cross-site-fab-wrap {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease;
+  }
+</style>
+</head>
+<body>
+
+  <div class="dev-note">
+    <b>이 배너는 목업 안내용이며 실제 위젯의 일부가 아닙니다.</b><br />
+    1) 브라우저 창 폭을 <code>1280px</code> 기준으로 좁혔다 넓혔다 해보세요 — 우측 데스크톱 레일 ↔ 우하단 모바일 FAB 전환을 확인할 수 있습니다(§4-1 계산 검증).<br />
+    2) 창 폭을 1280px 미만으로 좁힌 뒤 아래 가짜 계산기의 입력창을 클릭해 보세요 — FAB가 자동으로 사라집니다(§5-3 <code>:has()</code> 규칙 동작 확인, 입력창을 벗어나면 다시 나타남).<br />
+    3) 데스크톱 레일/모바일 패널 모두 "계산기 허브"(현재 사이트, 파란 강조)와 "대출모아"(준비 중, 회색 비활성)가 다른 2개 사이트와 어떻게 다르게 보이는지 확인하세요.
+  </div>
+
+  <div class="mode-indicator">
+    <span class="mobile-label">현재 상태: 모바일 FAB 모드 (0~1279px)</span>
+    <span class="desktop-label">현재 상태: 데스크톱 레일 모드 (1280px~)</span>
+  </div>
+
+  <header class="fake-header">
+    <div class="fake-header__inner">
+      <span class="fake-header__logo">계산기 허브</span>
+      <nav class="fake-header__nav">
+        <span>급여</span><span>대출</span><span>날짜</span><span>생활</span>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <h1>연봉 실수령액 계산기</h1>
+    <p class="subtitle">연봉과 부양가족 수를 입력하면 4대 보험·세금을 뺀 실수령액을 계산합니다. (가짜 계산기 — 레이아웃 확인용)</p>
+
+    <div class="calc-card">
+      <div class="field">
+        <label for="demo-salary">연봉 (세전, 원)</label>
+        <input id="demo-salary" class="demo-input" type="text" inputmode="numeric" placeholder="40,000,000" />
+      </div>
+      <div class="field">
+        <label for="demo-tax-free">식대 등 비과세 (월, 원)</label>
+        <input id="demo-tax-free" class="demo-input" type="text" inputmode="numeric" placeholder="200,000" />
+      </div>
+      <button type="button" class="calc-submit">연봉 실수령액 계산하기</button>
+    </div>
+
+    <div class="result-box">
+      <p class="label">예상 월 실수령액</p>
+      <p class="value">3,214,500 원</p>
+      <p class="label">가짜 결과값 — 실제 계산 로직 없음(레이아웃 확인용)</p>
+    </div>
+
+    <div class="filler-section">
+      <h2>자주 묻는 질문</h2>
+      <div class="filler-block">연봉과 월급 실수령액은 어떻게 다른가요? — 가짜 FAQ 텍스트, 스크롤 길이 확보용.</div>
+      <div class="filler-block">4대 보험은 어떻게 계산되나요? — 가짜 FAQ 텍스트, 스크롤 길이 확보용.</div>
+      <div class="filler-block">비과세 항목에는 어떤 것이 있나요? — 가짜 FAQ 텍스트, 스크롤 길이 확보용.</div>
+    </div>
+
+    <div class="filler-section">
+      <h2>관련 계산기</h2>
+      <div class="filler-block">4대 보험료 계산기 — 가짜 카드, 스크롤 길이 확보용.</div>
+      <div class="filler-block">퇴직금 계산기 — 가짜 카드, 스크롤 길이 확보용.</div>
+    </div>
+  </main>
+
+  <footer class="fake-footer">
+    가짜 푸터 — 사이트 소개 · 문의하기 · 개인정보처리방침 · 이용약관 (레이아웃 확인용)
+  </footer>
+
+  <!-- ==========================================================
+       실제 위젯 마크업 — design/cross-site-nav-widget-spec.md §4-3, §5-2, §5-4
+       스펙 §9(접근성)에 따라 본문(main)+푸터 다음, DOM 맨 끝에 배치(탭 순서)
+       ========================================================== -->
+
+  <!-- 데스크톱 레일 (xl, 1280px 이상) -->
+  <nav class="cross-site-rail" aria-label="관련 서비스 바로가기">
+    <p class="cross-site-rail__eyebrow" aria-hidden="true">관련 서비스</p>
+    <ul class="cross-site-rail__list">
+      <li>
+        <div class="rail-item rail-item--current" aria-current="page">
+          <span class="badge badge--blue" aria-hidden="true">계</span>
+          <span class="rail-label rail-label--current">계산기 허브</span>
+          <span class="rail-tag">현재</span>
+        </div>
+      </li>
+      <li>
+        <a class="rail-item" href="https://realestate-hub-6n4n.vercel.app" target="_blank" rel="noopener noreferrer"
+           title="아파트 실거래가 조회" aria-label="부동산 실거래가 대시보드 — 아파트 실거래가 조회 (새 탭에서 열림)">
+          <span class="badge badge--violet" aria-hidden="true">부</span>
+          <span class="rail-label">부동산 실거래가</span>
+        </a>
+      </li>
+      <li>
+        <a class="rail-item" href="https://cheongryak-radar.vercel.app" target="_blank" rel="noopener noreferrer"
+           title="청약홈·LH·SH 청약 캘린더/알림" aria-label="청약레이더 — 청약홈·LH·SH 청약 캘린더/알림 (새 탭에서 열림)">
+          <span class="badge badge--teal" aria-hidden="true">청</span>
+          <span class="rail-label">청약레이더</span>
+        </a>
+      </li>
+      <li>
+        <div class="rail-item rail-item--soon" aria-disabled="true">
+          <span class="badge badge--muted" aria-hidden="true">대</span>
+          <span class="rail-label rail-label--soon">대출모아</span>
+          <span class="rail-tag rail-tag--soon">준비 중</span>
+        </div>
+      </li>
+    </ul>
+  </nav>
+
+  <!-- 모바일 FAB (1280px 미만) -->
+  <div class="cross-site-fab-wrap">
+    <details class="cross-site-fab">
+      <summary aria-label="관련 서비스 바로가기">
+        <span class="fab-dots" aria-hidden="true"><span></span><span></span><span></span><span></span></span>
+      </summary>
+      <div class="fab-panel">
+        <p class="fab-panel__eyebrow">관련 서비스</p>
+        <ul class="fab-panel__list">
+          <li>
+            <div class="panel-row panel-row--current" aria-current="page">
+              <span class="badge badge--blue panel-badge" aria-hidden="true">계</span>
+              <span class="panel-text">
+                <span class="panel-name panel-name--current">계산기 허브</span>
+                <span class="panel-desc">실생활 계산기 모음 · 현재 사이트</span>
+              </span>
+            </div>
+          </li>
+          <li>
+            <a class="panel-row" href="https://realestate-hub-6n4n.vercel.app" target="_blank" rel="noopener noreferrer">
+              <span class="badge badge--violet panel-badge" aria-hidden="true">부</span>
+              <span class="panel-text">
+                <span class="panel-name">부동산 실거래가 대시보드</span>
+                <span class="panel-desc">아파트 실거래가 조회</span>
+              </span>
+              <span class="sr-only">(새 탭에서 열림)</span>
+            </a>
+          </li>
+          <li>
+            <a class="panel-row" href="https://cheongryak-radar.vercel.app" target="_blank" rel="noopener noreferrer">
+              <span class="badge badge--teal panel-badge" aria-hidden="true">청</span>
+              <span class="panel-text">
+                <span class="panel-name">청약레이더</span>
+                <span class="panel-desc">청약홈·LH·SH 청약 캘린더/알림</span>
+              </span>
+              <span class="sr-only">(새 탭에서 열림)</span>
+            </a>
+          </li>
+          <li>
+            <div class="panel-row panel-row--soon" aria-disabled="true">
+              <span class="badge badge--muted panel-badge" aria-hidden="true">대</span>
+              <span class="panel-text">
+                <span class="panel-name panel-name--soon">대출모아</span>
+                <span class="panel-desc panel-desc--soon">대출·금융·보험 비교 블로그 · 준비 중</span>
+              </span>
+            </div>
+          </li>
+        </ul>
+      </div>
+    </details>
+  </div>
+
+</body>
+</html>
