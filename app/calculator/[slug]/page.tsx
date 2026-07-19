@@ -139,11 +139,11 @@ export default async function CalculatorPage({
       {calculator.faq && <FaqAccordion items={calculator.faq} />}
 
       {calculator.status === "live" && (
-        <RelatedCalculators calculators={related} />
+        <RelatedCalculators calculators={related} columns={2} />
       )}
 
       {calculator.status === "live" && (
-        <RelatedBlogPosts posts={relatedPosts} />
+        <RelatedBlogPosts posts={relatedPosts} columns={2} />
       )}
     </div>
   );

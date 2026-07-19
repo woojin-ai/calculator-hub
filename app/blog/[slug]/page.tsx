@@ -189,7 +189,7 @@ export default async function BlogPostPage({
 
       <hr className="mt-10 border-brand-border" />
 
-      <RelatedCalculators calculators={related} />
+      <RelatedCalculators calculators={related} columns={2} />
 
       <RelatedBlogPosts
         posts={siblingPosts}
