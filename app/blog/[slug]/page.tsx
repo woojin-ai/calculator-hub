@@ -10,11 +10,13 @@ import {
   blogPosts,
   getBlogPostBySlug,
   getReadingTimeMinutes,
+  getRelatedBlogPosts,
   type BlogPost,
   type BlogSection,
 } from "@/lib/blog";
 import { buildBlogPostJsonLd } from "@/lib/blog-jsonld";
 import RelatedCalculators from "@/components/RelatedCalculators";
+import RelatedBlogPosts from "@/components/RelatedBlogPosts";
 import { SITE_URL } from "@/lib/site";
 
 export function generateStaticParams() {
@@ -145,6 +147,7 @@ export default async function BlogPostPage({
 
   const readingMinutes = getReadingTimeMinutes(post);
   const related = resolveRelatedCalculators(post);
+  const siblingPosts = getRelatedBlogPosts(post);
   const jsonLd = buildBlogPostJsonLd(post);
 
   return (
@@ -184,7 +187,15 @@ export default async function BlogPostPage({
         {post.body.map((section, i) => renderSection(section, i))}
       </article>
 
+      <hr className="mt-10 border-brand-border" />
+
       <RelatedCalculators calculators={related} />
+
+      <RelatedBlogPosts
+        posts={siblingPosts}
+        headingText="함께 읽으면 좋은 글"
+        columns={2}
+      />
 
       <div className="mt-10">
         <Link

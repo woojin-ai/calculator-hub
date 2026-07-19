@@ -4596,6 +4596,112 @@ export function getBlogPostsByCategory(category: BlogCategory): BlogPost[] {
     .slice(0, CATEGORY_RELATED_BLOG_LIMIT);
 }
 
+/** 상수: 블로그 상세 페이지 "함께 읽으면 좋은 글" 최대 노출 수. 2열 그리드 2×2로 정확히 채워진다. */
+export const POST_RELATED_BLOG_LIMIT = 4;
+
+/** 발행일 내림차순 → slug 오름차순. slug가 전역 유니크라 완전순서이며 SSG 빌드 결정성을 보장한다. */
+function compareByRecency(a: BlogPost, b: BlogPost): number {
+  return (
+    b.publishedDate.localeCompare(a.publishedDate) ||
+    a.slug.localeCompare(b.slug)
+  );
+}
+
+/** 그 글이 주로 지지하는 계산기(0번 슬롯). 빈 배열이면 undefined. */
+function primaryCalculatorSlug(post: BlogPost): string | undefined {
+  return post.relatedCalculatorSlugs[0];
+}
+
+/** 두 글이 공유하는 계산기 slug 개수 */
+function calculatorOverlapCount(a: BlogPost, b: BlogPost): number {
+  return a.relatedCalculatorSlugs.filter((s) =>
+    b.relatedCalculatorSlugs.includes(s),
+  ).length;
+}
+
+/** 두 글이 공유하는 태그 개수(완전일치) */
+function tagOverlapCount(a: BlogPost, b: BlogPost): number {
+  return a.tags.filter((t) => b.tags.includes(t)).length;
+}
+
+/**
+ * 블로그 상세 페이지의 형제 글 선정 (planning/blog-internal-linking-spec.md §1).
+ * 티어를 위에서부터 순서대로 채우며, 4편에 도달하면 이후 티어는 평가하지 않는다.
+ *   T1  같은 주력 계산기(primary 동등)
+ *   T2a 강한 계산기 겹침(overlap ≥ 2)
+ *   T3  같은 카테고리
+ *   T2b 약한 계산기 겹침(overlap = 1 + primary 앵커) — 장식성 3번 슬롯 노이즈를 앵커 조건으로 차단
+ *   T4  태그 겹침(안전망)
+ * 자기 자신은 모든 티어에서 제외하고, 한 글이 두 번 나오지 않도록 중복 제거한다.
+ */
+export function getRelatedBlogPosts(post: BlogPost): BlogPost[] {
+  const postPrimary = primaryCalculatorSlug(post);
+  const picked: BlogPost[] = [];
+  const pickedSlugs = new Set<string>([post.slug]); // 자기 자신 제외
+
+  const take = (
+    candidates: BlogPost[],
+    compare: (a: BlogPost, b: BlogPost) => number,
+  ) => {
+    if (picked.length >= POST_RELATED_BLOG_LIMIT) return;
+    for (const cand of candidates
+      .filter((c) => !pickedSlugs.has(c.slug))
+      .sort(compare)) {
+      if (picked.length >= POST_RELATED_BLOG_LIMIT) return;
+      picked.push(cand);
+      pickedSlugs.add(cand.slug);
+    }
+  };
+
+  // T1 — 같은 주력 계산기. primary가 없는 글(방어)은 T1/T2a/T2b를 건너뛴다.
+  if (postPrimary !== undefined) {
+    take(
+      blogPosts.filter((c) => primaryCalculatorSlug(c) === postPrimary),
+      compareByRecency,
+    );
+  }
+
+  // T2a — 계산기 2개 이상 공유. 카테고리 간 다리가 여기서 생긴다.
+  take(
+    blogPosts.filter((c) => calculatorOverlapCount(post, c) >= 2),
+    (a, b) =>
+      calculatorOverlapCount(post, b) - calculatorOverlapCount(post, a) ||
+      compareByRecency(a, b),
+  );
+
+  // T3 — 같은 카테고리
+  take(
+    blogPosts.filter((c) => c.category === post.category),
+    compareByRecency,
+  );
+
+  // T2b — 약한 겹침. primary 앵커가 없으면 무관한 글이 끌려오므로 반드시 앵커 조건을 건다.
+  if (postPrimary !== undefined) {
+    take(
+      blogPosts.filter((c) => {
+        if (calculatorOverlapCount(post, c) !== 1) return false;
+        const candPrimary = primaryCalculatorSlug(c);
+        return (
+          c.relatedCalculatorSlugs.includes(postPrimary) ||
+          (candPrimary !== undefined &&
+            post.relatedCalculatorSlugs.includes(candPrimary))
+        );
+      }),
+      compareByRecency,
+    );
+  }
+
+  // T4 — 태그 겹침(안전망). 현재 데이터에선 상위 티어의 부분집합에 가깝다.
+  take(
+    blogPosts.filter((c) => tagOverlapCount(post, c) >= 1),
+    (a, b) =>
+      tagOverlapCount(post, b) - tagOverlapCount(post, a) ||
+      compareByRecency(a, b),
+  );
+
+  return picked;
+}
+
 /** 본문 텍스트 길이 기반 예상 읽기 시간(분, 최소 1). 한국어 약 500자/분 가정 */
 export function getReadingTimeMinutes(post: BlogPost): number {
   const chars = post.body.reduce((sum, s) => {
