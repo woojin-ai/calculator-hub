@@ -2,11 +2,13 @@ import type { Metadata } from "next";
 import type { FaqItem } from "@/lib/calculators";
 import FaqAccordion from "@/components/FaqAccordion";
 import SupportInquiryForm from "@/components/SupportInquiryForm";
+import { canonicalUrl } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "고객센터 | 계산기 허브",
   description:
     "계산기 허브 이용 중 궁금한 점을 자주 묻는 질문에서 확인하고, 원하는 답을 찾지 못했다면 질문을 남겨보세요.",
+  alternates: { canonical: canonicalUrl("/support") },
 };
 
 // 콘텐츠 출처: planning/support-page-content.md (기획팀, 2026-07-13)

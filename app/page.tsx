@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -7,6 +8,12 @@ import {
   type CalculatorCategory,
 } from "@/lib/calculators";
 import CalculatorCard from "@/components/CalculatorCard";
+import { canonicalUrl } from "@/lib/site";
+
+// canonical만 지정한다. title/description은 의도적으로 비워 루트 layout.tsx의 값을 그대로 상속받는다.
+export const metadata: Metadata = {
+  alternates: { canonical: canonicalUrl("/") },
+};
 
 const CATEGORY_ORDER: CalculatorCategory[] = ["salary", "loan", "date", "life"];
 
