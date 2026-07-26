@@ -50,7 +50,7 @@ function RailItem({
         <span className="w-full break-keep text-[11px] font-semibold leading-tight text-brand-primary">
           {site.shortLabel}
         </span>
-        <span className="w-full text-[9px] text-brand-text-secondary">
+        <span className="w-full text-[11px] text-brand-text-secondary">
           현재
         </span>
       </div>
@@ -67,7 +67,7 @@ function RailItem({
         <span className="w-full break-keep text-[11px] font-medium leading-tight text-brand-text-disabled">
           {site.shortLabel}
         </span>
-        <span className="w-full text-[9px] text-brand-text-disabled">
+        <span className="w-full text-[11px] text-brand-text-disabled">
           준비 중
         </span>
       </div>

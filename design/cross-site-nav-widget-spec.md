@@ -427,7 +427,7 @@ body:has(main input:focus, main select:focus, main textarea:focus) .cross-site-f
     계
   </span>
   <span className="text-[11px] font-semibold leading-tight text-brand-primary">계산기 허브</span>
-  <span className="text-[9px] text-brand-text-secondary">현재</span>
+  <span className="text-[11px] text-brand-text-secondary">현재</span>
 </div>
 ```
 
@@ -458,7 +458,7 @@ body:has(main input:focus, main select:focus, main textarea:focus) .cross-site-f
     대
   </span>
   <span className="text-[11px] font-medium leading-tight text-brand-text-disabled">대출모아</span>
-  <span className="text-[9px] text-brand-text-disabled">준비 중</span>
+  <span className="text-[11px] text-brand-text-disabled">준비 중</span>
 </div>
 ```
 
