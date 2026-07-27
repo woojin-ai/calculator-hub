@@ -6,6 +6,7 @@ import {
   type CalculatorCategory,
 } from "@/lib/calculators";
 import { canonicalUrl } from "@/lib/site";
+import { buildOpenGraph } from "@/lib/og";
 
 const CATEGORY_ORDER: CalculatorCategory[] = ["salary", "loan", "date", "life"];
 
@@ -14,6 +15,7 @@ export const metadata: Metadata = {
   description:
     "계산기 허브는 급여, 대출, 날짜, 생활 등 일상에서 자주 필요한 계산을 무료로 제공하는 계산기 모음 사이트입니다.",
   alternates: { canonical: canonicalUrl("/about") },
+  openGraph: buildOpenGraph({ path: "/about" }),
 };
 
 export default function AboutPage() {

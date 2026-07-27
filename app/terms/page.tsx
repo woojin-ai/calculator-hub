@@ -3,6 +3,7 @@ import LegalPageLayout, {
   type LegalSection,
 } from "@/components/LegalPageLayout";
 import { canonicalUrl } from "@/lib/site";
+import { buildOpenGraph } from "@/lib/og";
 
 // 내부 기록용 메모(사이트 비노출, planning/terms-content.md 상단 HTML 주석 승계):
 // 본 이용약관은 변호사 등 법률 전문가의 검토를 거치지 않은 표준 템플릿 기반 초안이다.
@@ -15,6 +16,7 @@ export const metadata: Metadata = {
   description:
     "계산기 허브 서비스 이용조건, 이용자의 권리·의무, 계산 결과 면책조항 등을 안내하는 이용약관입니다.",
   alternates: { canonical: canonicalUrl("/terms") },
+  openGraph: buildOpenGraph({ path: "/terms" }),
 };
 
 const SECTIONS: LegalSection[] = [

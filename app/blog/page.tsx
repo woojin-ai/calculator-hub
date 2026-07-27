@@ -3,6 +3,7 @@ import { notFound, permanentRedirect } from "next/navigation";
 import { getAllBlogPosts, toBlogListItems, BLOG_PAGE_SIZE } from "@/lib/blog";
 import BlogListWithSearch from "@/components/BlogListWithSearch";
 import { SITE_URL } from "@/lib/site";
+import { buildOpenGraph } from "@/lib/og";
 
 type BlogSearchParams = Promise<{ page?: string | string[] }>;
 
@@ -40,6 +41,10 @@ export async function generateMetadata({
     alternates: {
       canonical: page > 1 ? `${SITE_URL}/blog?page=${page}` : `${SITE_URL}/blog`,
     },
+    // canonical과 동일한 분기식을 쓴다(목록은 기사가 아니므로 og:type=website).
+    openGraph: buildOpenGraph({
+      path: page > 1 ? `/blog?page=${page}` : "/blog",
+    }),
   };
 }
 

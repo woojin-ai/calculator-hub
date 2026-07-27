@@ -18,6 +18,7 @@ import { buildBlogPostJsonLd } from "@/lib/blog-jsonld";
 import RelatedCalculators from "@/components/RelatedCalculators";
 import RelatedBlogPosts from "@/components/RelatedBlogPosts";
 import { SITE_URL } from "@/lib/site";
+import { buildOpenGraph } from "@/lib/og";
 
 export function generateStaticParams() {
   return blogPosts.map((post) => ({ slug: post.slug }));
@@ -36,6 +37,14 @@ export async function generateMetadata({
     title: `${post.title} | 계산기 허브`,
     description: post.description,
     alternates: { canonical: `${SITE_URL}/blog/${post.slug}` },
+    // 사이트에서 유일한 진짜 기사 → og:type=article (사양 §4).
+    // article:modified_time 폴백 규칙은 blog-jsonld.ts와 동일하게 updatedDate ?? publishedDate.
+    openGraph: buildOpenGraph({
+      path: `/blog/${post.slug}`,
+      type: "article",
+      publishedDate: post.publishedDate,
+      updatedDate: post.updatedDate,
+    }),
   };
 }
 

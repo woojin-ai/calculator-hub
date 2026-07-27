@@ -9,6 +9,7 @@ import {
 } from "@/lib/calculators";
 import { buildCalculatorJsonLd } from "@/lib/calculator-jsonld";
 import { canonicalUrl } from "@/lib/site";
+import { buildOpenGraph } from "@/lib/og";
 import AgeCalculator from "@/components/AgeCalculator";
 import AnnualLeaveAllowanceCalculator from "@/components/AnnualLeaveAllowanceCalculator";
 import DdayCalculator from "@/components/DdayCalculator";
@@ -70,6 +71,9 @@ export async function generateMetadata({
     // 자기참조 canonical. raw slug가 아니라 조회로 확정된 calculator.slug를 쓴다
     // (존재하지 않는 slug는 위에서 {}로 조기 반환되어 여기 도달하지 않는다).
     alternates: { canonical: canonicalUrl(`/calculator/${calculator.slug}`) },
+    // 계산기는 기사가 아니라 도구이므로 og:type=website다(사양 §4).
+    // coming-soon(noindex)에도 분기 없이 동일하게 붙인다 — OG는 색인이 아니라 공유 프리뷰용(§5-5).
+    openGraph: buildOpenGraph({ path: `/calculator/${calculator.slug}` }),
     // coming-soon 스텁 페이지는 콘텐츠가 없으므로 검색엔진 색인에서 제외한다.
     robots:
       calculator.status === "coming-soon"

@@ -3,6 +3,7 @@ import LegalPageLayout, {
   type LegalSection,
 } from "@/components/LegalPageLayout";
 import { canonicalUrl } from "@/lib/site";
+import { buildOpenGraph } from "@/lib/og";
 
 // 내부 기록용 메모(사이트 비노출, planning/privacy-policy-content.md 상단 HTML 주석 승계):
 // 본 개인정보처리방침은 변호사 등 법률 전문가의 검토를 거치지 않은 표준 템플릿 기반 초안이다.
@@ -15,6 +16,7 @@ export const metadata: Metadata = {
   description:
     "계산기 허브의 개인정보 수집·이용·보관 및 쿠키, 광고 게재와 관련된 개인정보처리방침을 안내합니다.",
   alternates: { canonical: canonicalUrl("/privacy") },
+  openGraph: buildOpenGraph({ path: "/privacy" }),
 };
 
 const SECTIONS: LegalSection[] = [

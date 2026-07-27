@@ -5,6 +5,7 @@ import SiteHeader from "@/components/SiteHeader";
 import SiteFooter from "@/components/SiteFooter";
 import CrossSiteNav from "@/components/CrossSiteNav";
 import { buildSiteJsonLd } from "@/lib/site-jsonld";
+import { SITE_URL } from "@/lib/site";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -17,6 +18,13 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  // URL 기반 메타데이터 필드의 기준 URL. 현재 canonical/og:url은 전부 절대 URL을
+  // 넘기므로 이 값은 무시되지만(resolve-url.js: URL 파싱 성공 시 metadataBase 무시),
+  // 향후 og:image 등 상대경로 필드가 생길 때 환경(로컬/프리뷰/프로덕션)에 따라
+  // 호스트가 달라지는 것을 원천 차단한다(planning/og-metadata-spec.md §2).
+  // openGraph는 루트에 두지 않는다 — 얕은 병합 때문에 전 페이지가 홈 og:url을
+  // 물려받는 사고를 막기 위해 각 페이지가 buildOpenGraph()로 생성한다(사양 §5-2).
+  metadataBase: new URL(SITE_URL),
   title: "계산기 허브 | 실생활에 필요한 계산기 모음",
   description:
     "만 나이, 연봉 실수령액, 대출 이자, D-Day 등 실생활에 필요한 계산기를 무료로 이용해 보세요.",

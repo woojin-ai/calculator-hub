@@ -9,10 +9,13 @@ import {
 } from "@/lib/calculators";
 import CalculatorCard from "@/components/CalculatorCard";
 import { canonicalUrl } from "@/lib/site";
+import { buildOpenGraph } from "@/lib/og";
 
 // canonical만 지정한다. title/description은 의도적으로 비워 루트 layout.tsx의 값을 그대로 상속받는다.
+// (og:title/og:description도 같은 값을 자동 상속받는다.)
 export const metadata: Metadata = {
   alternates: { canonical: canonicalUrl("/") },
+  openGraph: buildOpenGraph({ path: "/" }),
 };
 
 const CATEGORY_ORDER: CalculatorCategory[] = ["salary", "loan", "date", "life"];

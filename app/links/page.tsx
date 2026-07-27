@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
 import { CROSS_SITE_LINKS } from "@/lib/cross-site-links";
 import { canonicalUrl } from "@/lib/site";
+import { buildOpenGraph } from "@/lib/og";
 
 export const metadata: Metadata = {
   title: "사이트 모음 | 계산기 허브",
   description:
     "계산기 허브, 청약레이더, 부동산 실거래가 대시보드, 대출모아 — 운영 중인 사이트 모음입니다.",
   alternates: { canonical: canonicalUrl("/links") },
+  openGraph: buildOpenGraph({ path: "/links" }),
   robots: { index: false, follow: true },
 };
 
