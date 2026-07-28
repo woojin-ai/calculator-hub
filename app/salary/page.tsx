@@ -6,7 +6,9 @@ import { buildOpenGraph } from "@/lib/og";
 
 export const metadata: Metadata = {
   title: `${categoryInfo.salary.title} | 계산기 허브`,
-  description: categoryInfo.salary.description,
+  // SERP 스니펫 전용. 화면(CategoryPage 리드·홈/about 카드)과 JSON-LD는 description을 쓴다.
+  description:
+    categoryInfo.salary.metaDescription ?? categoryInfo.salary.description,
   alternates: { canonical: canonicalUrl("/salary") },
   openGraph: buildOpenGraph({ path: "/salary" }),
 };

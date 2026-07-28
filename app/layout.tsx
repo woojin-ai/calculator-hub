@@ -26,8 +26,12 @@ export const metadata: Metadata = {
   // 물려받는 사고를 막기 위해 각 페이지가 buildOpenGraph()로 생성한다(사양 §5-2).
   metadataBase: new URL(SITE_URL),
   title: "계산기 허브 | 실생활에 필요한 계산기 모음",
+  // 루트 metadata의 description. 화면에는 렌더되지 않는다(홈 히어로 문단은
+  // app/page.tsx가 별도로 가진 하드코딩 문자열이며 이 값과 무관하다).
+  // description을 지정하지 않는 페이지는 이 값을 상속하는데, 현재 `/`를 제외한
+  // 모든 라우트가 자체 description을 갖고 있어 상속 대상은 `/` 하나뿐이다.
   description:
-    "만 나이, 연봉 실수령액, 대출 이자, D-Day 등 실생활에 필요한 계산기를 무료로 이용해 보세요.",
+    "만 나이와 디데이, 연봉 실수령액과 퇴직금, 대출 이자와 중도상환수수료, 전기요금까지. 급여·대출·날짜·생활 네 가지 분야의 계산기를 회원가입 없이 무료로 이용해 보세요.",
   verification: {
     google: "_YX3kbSeZq2clAsi9usIngHj7Q_4ScH4ywFCIpREnvQ",
     other: {

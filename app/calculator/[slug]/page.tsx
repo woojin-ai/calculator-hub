@@ -67,7 +67,9 @@ export async function generateMetadata({
 
   return {
     title: `${calculator.title} | 계산기 허브`,
-    description: calculator.shortDescription,
+    // SERP 스니펫 전용 metaDescription이 있으면 그것을, 없으면 화면용 shortDescription을 쓴다.
+    // 화면(아래 리드 문단·CalculatorCard)과 JSON-LD는 계속 shortDescription을 쓴다 — 의도된 분리.
+    description: calculator.metaDescription ?? calculator.shortDescription,
     // 자기참조 canonical. raw slug가 아니라 조회로 확정된 calculator.slug를 쓴다
     // (존재하지 않는 slug는 위에서 {}로 조기 반환되어 여기 도달하지 않는다).
     alternates: { canonical: canonicalUrl(`/calculator/${calculator.slug}`) },

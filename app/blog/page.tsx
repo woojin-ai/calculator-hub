@@ -37,7 +37,7 @@ export async function generateMetadata({
   const suffix = page > 1 ? ` (${page}페이지)` : "";
   return {
     title: `블로그${suffix} | 계산기 허브`,
-    description: `계산기 활용법과 생활 정보를 정리한 글 모음입니다.${suffix}`,
+    description: `연봉 실수령액과 퇴직금, 대출 이자, 만 나이처럼 자주 찾는 계산을 예시와 함께 풀어 쓴 글을 모았습니다. 계산기 사용법과 알아두면 좋은 생활 정보를 정리한 블로그입니다.${suffix}`,
     alternates: {
       canonical: page > 1 ? `${SITE_URL}/blog?page=${page}` : `${SITE_URL}/blog`,
     },

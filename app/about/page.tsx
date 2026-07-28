@@ -19,6 +19,13 @@ export const metadata: Metadata = {
 };
 
 export default function AboutPage() {
+  // 카테고리 카드의 "라이브 계산기 N개"와 아래 목록이 서로 어긋나지 않도록,
+  // 판별 기준(status === "live")을 한 곳에서만 계산해 양쪽이 같은 배열을 공유한다.
+  const liveByCategory = CATEGORY_ORDER.map((category) => ({
+    category,
+    live: getCalculatorsByCategory(category).filter((c) => c.status === "live"),
+  }));
+
   return (
     <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6 sm:py-14">
       <section className="text-center sm:text-left">
@@ -47,10 +54,8 @@ export default function AboutPage() {
           계산기는 아래 네 가지 카테고리로 나누어 제공합니다.
         </p>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {CATEGORY_ORDER.map((category) => {
-            const liveCount = getCalculatorsByCategory(category).filter(
-              (c) => c.status === "live"
-            ).length;
+          {liveByCategory.map(({ category, live }) => {
+            const liveCount = live.length;
 
             return (
               <Link
@@ -72,17 +77,40 @@ export default function AboutPage() {
           })}
         </div>
 
+        {/*
+          현재 바로 사용할 수 있는 계산기 목록. 하드코딩하지 않고 lib/calculators.ts에서
+          파생시킨다 — 계산기를 추가해도 이 문단이 자동으로 따라오도록 하기 위함이며,
+          바로 위 카테고리 카드와 동일한 liveByCategory(status === "live")를 공유한다.
+          16개를 평면 나열하면 375px에서 세로로 과도하게 길어지므로 카테고리별로 묶는다.
+          각 계산기는 인라인 텍스트 링크가 아니라 칩(알약) 링크로 낸다 — 375px 실측에서
+          인라인 링크는 높이 18px에 인접 간격 4.8~6.3px라 모바일 오탭 위험이 있었다.
+          칩은 min-h-9(36px, 사이트 표준 터치타깃) + gap-2(8px, 수평·수직 동시 적용)로
+          간격 하한을 보장한다. 알약 스타일 자체는 /support의 앵커 링크와 동일 어휘.
+        */}
         <div className="mt-6 text-sm leading-relaxed text-brand-text-secondary sm:text-base">
           <p>현재 바로 사용할 수 있는 계산기는 다음과 같습니다.</p>
-          <ul className="mt-2 list-inside list-disc space-y-1">
-            <li>만 나이 계산기 — 생년월일로 오늘 기준 만 나이를 계산합니다.</li>
-            <li>D-Day 계산기 — 기준일까지 남은(또는 지난) 일수를 계산합니다.</li>
-            <li>BMI 계산기 — 키와 몸무게로 체질량지수를 계산합니다.</li>
+          <ul className="mt-2 space-y-2">
+            {liveByCategory
+              .filter(({ live }) => live.length > 0)
+              .map(({ category, live }) => (
+                <li key={category} className="flex flex-wrap items-center gap-2">
+                  <span className="font-semibold text-brand-text">
+                    {categoryInfo[category].title} —
+                  </span>
+                  {live.map((calculator) => (
+                    <Link
+                      key={calculator.slug}
+                      href={`/calculator/${calculator.slug}`}
+                      className="inline-flex min-h-9 items-center rounded-full border border-brand-border px-3 text-sm font-medium text-brand-text-secondary transition-colors hover:border-brand-primary hover:text-brand-primary"
+                    >
+                      {calculator.title}
+                    </Link>
+                  ))}
+                </li>
+              ))}
           </ul>
           <p className="mt-3">
-            급여·대출 카테고리 계산기는 현재 준비 중이며, 순차적으로 추가될
-            예정입니다. 새로 추가되는 계산기는 각 카테고리 페이지에서
-            확인하실 수 있습니다.
+            새로 추가되는 계산기는 각 카테고리 페이지에서 확인하실 수 있습니다.
           </p>
         </div>
       </section>
