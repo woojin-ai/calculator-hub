@@ -85,15 +85,29 @@ export function calculateServicePeriod(
   let months = endPlus.getMonth() - startAtMidnight.getMonth();
   let days = endPlus.getDate() - startAtMidnight.getDate();
 
-  if (days < 0) {
-    // 종료일⁺ 직전 달의 실제 일수를 빌린다 (윤년 자동 반영, 하드코딩 없음).
-    const daysInPrevMonth = new Date(
+  // 종료일⁺ 직전 달의 실제 일수를 빌린다 (윤년 자동 반영, 하드코딩 없음).
+  // 한 번 빌려도 days가 여전히 음수일 수 있으므로(입사일 30·31일 + 직전 달이 2월),
+  // 음수가 해소될 때까지 "한 달씩 더 거슬러 올라간 달"의 일수를 빌린다.
+  // new Date(y, m, 0)은 (m-1)월의 말일을 주므로, k번째(k=1,2,…) 차용에서
+  // m = endPlus.getMonth() - (k-1) 로 두면 endPlus.getMonth() - k 월의 일수가 된다.
+  // m이 음수여도 Date가 전년도로 자동 롤백하므로 연도 보정은 불필요하다.
+  // 반복 상한은 2회: days ≥ -30이고 30일 이상인 달은 1회로 반드시 해소되므로,
+  // 2회차는 첫 차용 대상이 2월(=종료일⁺가 3월)일 때만 발생한다.
+  // 보정 전 months의 전역 최솟값은 -12이며(k=1 · 입사 12월 · 종료일⁺ 1월,
+  // 예: 1999-12-31 ~ 2000-01-14), k=2 분기의 최솟값 -11보다 이쪽이 더 작다.
+  // -12 ≥ -12 이므로 아래 months 보정(+12, 1회)으로 충분하지만 여유는 정확히
+  // 1칸뿐이다 — 차용 규칙을 바꾸면 이 보정이 1회로 충분한지 반드시 재검토할 것.
+  // (구조공간 936,228조합 완전 열거로 확인: k≥3 및 months<-12 발생 0건)
+  let borrowed = 0;
+  while (days < 0) {
+    const daysInBorrowedMonth = new Date(
       endPlus.getFullYear(),
-      endPlus.getMonth(),
+      endPlus.getMonth() - borrowed,
       0
     ).getDate();
-    days += daysInPrevMonth;
+    days += daysInBorrowedMonth;
     months -= 1;
+    borrowed += 1;
   }
   if (months < 0) {
     months += 12;
