@@ -169,10 +169,13 @@ suite("four-insurance", (t) => {
 // 3) loan — 대출 상환(원리금균등/원금균등)
 //    출처: planning/loan-interest-calculator-content.md §1-3
 //          + planning/dsr-calculator-content.md §1-4 앵커 B(엔진 실측 잠금)
-//    ※ 불일치(보고 대상): loan-interest §1-3은 "약" 표기 수기 근사치
-//      (원리금 899,130/총이자 2,368,790, 원금균등 마지막회차 836,806)를 적었으나
-//      엔진 실측은 899,127 / 2,368,572 / 836,817 이다. 문서가 스스로 "근사"라 명시 →
-//      엔진값 잠금.
+//    ※ 2026-07-29 해소(티켓 #9): 과거 이 주석은 §1-3 수기 근사치
+//      (899,130 / 2,368,790 / 836,806)와 엔진 실측(899,127 / 2,368,572 / 836,817)의
+//      불일치를 "보고 대상"으로 적어두고 엔진값만 잠갔다. 그러나 그 근사치는 이미
+//      lib/calculators.ts의 라이브 본문으로 복사돼 사용자에게 노출되고 있었고,
+//      이 주석은 아무도 escalate하지 않아 13일간 방치됐다.
+//      → 본문·기획문서를 엔진값으로 정정 완료. 이제 문서와 엔진이 일치한다.
+//      교훈: 테스트가 문서 불일치를 발견하면 주석에 적지 말고 티켓으로 올릴 것.
 // =============================================================================
 
 suite("loan", (t) => {
@@ -180,8 +183,8 @@ suite("loan", (t) => {
   const ep = calculateLoan(30_000_000, 5, 36, "equalPayment");
   assert.ok(ep && ep.type === "equalPayment", "loan equalPayment null/type");
   if (ep.type === "equalPayment") {
-    t.eq(ep.monthlyPayment, 899_127, "원리금균등 월상환(문서 §1-3=899,130 근사)");
-    t.eq(ep.totalInterest, 2_368_572, "원리금균등 총이자(문서=2,368,790 근사)");
+    t.eq(ep.monthlyPayment, 899_127, "원리금균등 월상환(문서 §1-3 정정값과 일치)");
+    t.eq(ep.totalInterest, 2_368_572, "원리금균등 총이자(문서 정정값과 일치)");
     t.eq(ep.totalPayment, 32_368_572, "원리금균등 총상환");
   }
 
@@ -190,7 +193,7 @@ suite("loan", (t) => {
   assert.ok(pr && pr.type === "equalPrincipal", "loan equalPrincipal null/type");
   if (pr.type === "equalPrincipal") {
     t.eq(pr.firstPayment, 958_333, "원금균등 1회차(원금 833,333+이자 125,000)");
-    t.eq(pr.lastPayment, 836_817, "원금균등 마지막회차(문서=836,806 근사)");
+    t.eq(pr.lastPayment, 836_817, "원금균등 마지막회차(문서 정정값과 일치)");
     t.eq(pr.totalInterest, 2_312_500, "원금균등 총이자");
     t.eq(pr.totalPayment, 32_312_500, "원금균등 총상환(= P + 총이자)");
   }
