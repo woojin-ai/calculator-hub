@@ -17,9 +17,10 @@
 
 import assert from "node:assert/strict";
 
-import { calculateSalary } from "../../lib/salary";
+import { calculateSalary, EMPLOYMENT_INSURANCE_RATE } from "../../lib/salary";
 import {
   calculateFourInsurance,
+  EMPLOYMENT_STABILITY_RATE,
   type BusinessSize,
 } from "../../lib/four-insurance";
 import { calculateLoan } from "../../lib/loan";
@@ -113,6 +114,29 @@ suite("salary", (t) => {
   t.eq(r!.monthlyNet, 2_912_616, "월 실수령액(약 291만, §1-4 범위 289~293만 내)");
   t.eq(r!.annualNet, 34_951_392, "연 환산 실수령액(약 3,495만)");
 
+  // ---------------------------------------------------------------------------
+  // 앵커 S2 — 고용보험 정수 bp 연산 잠금 (2026-07-29 티켓 #10)
+  //
+  // 위 앵커(연봉 4,000만)는 T=3,133,333이라 3,133,333 × 9 = 28,199,997 로
+  // float식/정수bp식이 우연히 28,199로 같아져 결함을 통과시킨다.
+  // 실제로 QA 변이 테스트에서 lib/salary.ts만 float으로 되돌려도 전 스위트가
+  // 통과했다. 그래서 두 식이 갈리는 T=3,000,000을 만드는 앵커를 따로 둔다.
+  //   float식 : Math.floor(3_000_000 * 0.009) = 26,999  ← 결함
+  //   정수bp식: Math.floor(3_000_000 * 90 / 10_000) = 27,000  ← 정답
+  // 이 앵커가 깨지면 고용보험 계산이 실수 요율 곱셈으로 되돌아간 것이다.
+  // ---------------------------------------------------------------------------
+  const s2 = calculateSalary({
+    annualSalary: 36_000_000,
+    taxFreeMonthly: 0,
+    dependents: 1,
+    children: 0,
+  });
+  assert.ok(s2 !== null, "salary S2: 유효 입력이 null 반환");
+  t.eq(s2!.monthlyTaxable, 3_000_000, "S2 월 과세대상급여 T");
+  t.eq(s2!.employmentInsurance, 27_000, "S2 고용보험(정수 bp; float식이면 26,999)");
+  t.eq(s2!.insuranceTotal, 291_311, "S2 4대보험 합계");
+  t.eq(s2!.monthlyNet, 2_609_952, "S2 월 실수령액");
+
   // 계약: 무효 입력은 null
   t.eq(calculateSalary({ annualSalary: 0, taxFreeMonthly: 0, dependents: 1, children: 0 }), null, "연봉 0 → null");
   t.eq(calculateSalary({ annualSalary: 40_000_000, taxFreeMonthly: 0, dependents: 0, children: 0 }), null, "부양가족<1 → null");
@@ -122,6 +146,11 @@ suite("salary", (t) => {
 // =============================================================================
 // 2) four-insurance — 4대보험료(근로자/사업주/합계)
 //    출처: planning/four-insurance-calculator-content.md §1-4 앵커 A~D (QA 검증, 150인 미만)
+//    ※ 2026-07-29(티켓 #10) 고용보험 정수 bp 산술 전환으로 갱신된 앵커:
+//      B 근로자 고용보험 26,999→27,000 · 근로자 소계 291,310→291,311 · 총합 590,121→590,122
+//      D 근로자 소계 660,251→660,252 · 총합 1,338,003→1,338,004 (고용보험 62,999→63,000)
+//      A·C는 불변(2,000,000·5,000,000은 0.9%가 부동소수 오차 없이 떨어짐).
+//      B'(over150Priority) 신설 — 사업주 0.9%+0.45% float 합산 결함(40,499) 회귀 잠금.
 // =============================================================================
 
 suite("four-insurance", (t) => {
@@ -140,11 +169,25 @@ suite("four-insurance", (t) => {
   t.eq(b!.nationalPension.employee, 142_500, "B 국민연금 근로자");
   t.eq(b!.healthInsurance.employee, 107_850, "B 건강보험 근로자");
   t.eq(b!.longTermCare.employee, 13_961, "B 장기요양 근로자");
-  t.eq(b!.employmentInsurance.employee, 26_999, "B 고용보험 근로자(float floor 실측)");
+  t.eq(b!.employmentInsurance.employee, 27_000, "B 고용보험 근로자");
   t.eq(b!.employmentInsurance.employer, 34_500, "B 고용보험 사업주(1.15%)");
-  t.eq(b!.employeeTotal, 291_310, "B 근로자 소계");
+  t.eq(b!.employeeTotal, 291_311, "B 근로자 소계");
   t.eq(b!.employerTotal, 298_811, "B 사업주 소계");
-  t.eq(b!.grandTotal, 590_121, "B 총합");
+  t.eq(b!.grandTotal, 590_122, "B 총합");
+
+  // 앵커 B': T=3,000,000 · over150Priority(사업주 0.9%+0.45%=1.35%)
+  //   float `0.009 + 0.0045`는 0.013499999999999998로 평가되어 floor가 40,499가 됐다.
+  //   정수 bp(135/10,000) 전환으로 40,500. 이 앵커가 사업주분 부동소수 결함을 잠근다.
+  const bPriority = calculateFourInsurance({
+    monthlyTaxable: 3_000_000,
+    businessSize: "over150Priority",
+  });
+  assert.ok(bPriority !== null, "4대보험 B' null");
+  t.eq(bPriority!.employmentInsurance.employee, 27_000, "B' 고용보험 근로자(0.9%)");
+  t.eq(bPriority!.employmentInsurance.employer, 40_500, "B' 고용보험 사업주(1.35%)");
+  t.eq(bPriority!.employeeTotal, 291_311, "B' 근로자 소계(규모 무관, B와 동일)");
+  t.eq(bPriority!.employerTotal, 304_811, "B' 사업주 소계");
+  t.eq(bPriority!.grandTotal, 596_122, "B' 총합");
 
   // 앵커 C: T=5,000,000
   const c = calculateFourInsurance({ monthlyTaxable: 5_000_000, businessSize: under150 });
@@ -157,9 +200,10 @@ suite("four-insurance", (t) => {
   t.eq(d!.pensionBase, 6_590_000, "D 기준소득월액 상한 clamp");
   t.eq(d!.isPensionCapped, true, "D isPensionCapped");
   t.eq(d!.nationalPension.employee, 313_025, "D 국민연금 근로자(clamp 고정)");
-  t.eq(d!.employeeTotal, 660_251, "D 근로자 소계");
+  t.eq(d!.employmentInsurance.employee, 63_000, "D 고용보험 근로자(0.9%)");
+  t.eq(d!.employeeTotal, 660_252, "D 근로자 소계");
   t.eq(d!.employerTotal, 677_752, "D 사업주 소계");
-  t.eq(d!.grandTotal, 1_338_003, "D 총합");
+  t.eq(d!.grandTotal, 1_338_004, "D 총합");
 
   // 계약: 무효 입력 → null
   t.eq(calculateFourInsurance({ monthlyTaxable: 0, businessSize: under150 }), null, "T=0 → null");
@@ -795,6 +839,47 @@ suite("car-tax", (t) => {
   t.eq(badYear.ok === false && badYear.error, "invalid-year", "연도 에러코드 invalid-year");
   // eco도 등록연도 방어는 동일 적용(배기량은 무시)
   t.eq(calculateCarTax({ kind: "eco", cc: 0, registerYear: 2027 }).ok, false, "eco 연도 초과 → invalid-year");
+});
+
+// =============================================================================
+// 요율 → 정수 bp 변환 가드 (2026-07-29 티켓 #10)
+//
+// 고용보험 계산은 요율을 정수 베이시스포인트(1/10,000)로 바꿔서 쓴다:
+//   EMPLOYMENT_INSURANCE_BP   = Math.round(EMPLOYMENT_INSURANCE_RATE * 10_000)
+//   EMPLOYMENT_STABILITY_BP[] = Math.round(EMPLOYMENT_STABILITY_RATE[..] * 10_000)
+//
+// 이 변환은 **0.5bp 단위 요율을 조용히 반올림한다.** 예를 들어 요율이 0.925%로
+// 바뀌면 92.5bp가 정답인데 Math.round가 에러 없이 93으로 올려 버려서, 아무도
+// 모르는 사이에 보험료가 틀어진다(0.5bp × 300만원 = 월 150원).
+//
+// 그래서 "현행 요율이 전부 정수 bp로 정확히 표현되는가"를 여기서 잠근다.
+// 요율 갱신자가 0.5bp 요율을 넣으면 이 테스트가 즉시 깨지고, 그때는 bp 분모를
+// 10_000에서 100_000으로 올리는 등 표현 방식을 바꿔야 한다.
+// =============================================================================
+
+suite("rate→bp 변환 가드", (t) => {
+  const cases: { label: string; rate: number }[] = [
+    { label: "고용보험(근로자) 0.9%", rate: EMPLOYMENT_INSURANCE_RATE },
+    { label: "고용안정 under150 0.25%", rate: EMPLOYMENT_STABILITY_RATE.under150 },
+    { label: "고용안정 over150Priority 0.45%", rate: EMPLOYMENT_STABILITY_RATE.over150Priority },
+    { label: "고용안정 from150to1000 0.65%", rate: EMPLOYMENT_STABILITY_RATE.from150to1000 },
+    { label: "고용안정 over1000 0.85%", rate: EMPLOYMENT_STABILITY_RATE.over1000 },
+  ];
+
+  for (const c of cases) {
+    // Math.round 가 값을 바꾸지 않아야 한다 = 정수 bp로 정확히 표현된다.
+    const scaled = c.rate * 10_000;
+    t.eq(
+      Math.abs(scaled - Math.round(scaled)) < 1e-6,
+      true,
+      `${c.label} → 정수 bp로 표현 가능(${scaled})`
+    );
+  }
+
+  // 가드가 실제로 동작하는지 자체 검증: 0.5bp 요율은 반드시 걸려야 한다.
+  const halfBp = 0.00925 * 10_000; // 92.5 — 정수 bp로 표현 불가
+  t.eq(Math.abs(halfBp - Math.round(halfBp)) < 1e-6, false, "가드 자체 검증: 0.925%는 정수 bp 불가로 감지");
+  t.eq(Math.round(halfBp), 93, "가드 자체 검증: Math.round가 92.5를 93으로 올림(요율 왜곡)");
 });
 
 // -----------------------------------------------------------------------------

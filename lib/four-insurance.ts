@@ -10,6 +10,7 @@
 //   근로자 4대 보험료가 원 단위까지 일치.)
 //
 // 신규 상수는 "고용보험 사업주의 고용안정·직업능력개발사업 요율 맵" 1건뿐이다.
+//   (+ 그 맵에서 파생한 계산 전용 정수 bp 맵. 요율 리터럴을 새로 쓰지 않는다 — 아래 주석 참조)
 //
 // 라운딩: 각 보험료 원 단위 절사(Math.floor). 국민연금 기준소득월액은 천원 절사 후 clamp.
 //   사업주 부담분도 각각 개별 floor(근로자분 복사 아님 — 국민연금·건강은 base가 같아
@@ -22,7 +23,7 @@ import {
   NATIONAL_PENSION_BASE_MAX,
   HEALTH_INSURANCE_RATE,
   LONG_TERM_CARE_MULTIPLIER,
-  EMPLOYMENT_INSURANCE_RATE,
+  EMPLOYMENT_INSURANCE_BP,
   floorTo1000,
 } from "@/lib/salary";
 
@@ -50,6 +51,27 @@ export const EMPLOYMENT_STABILITY_RATE: Record<BusinessSize, number> = {
   over150Priority: 0.0045,
   from150to1000: 0.0065,
   over1000: 0.0085,
+};
+
+/**
+ * 위 실수 요율에서 **파생**한 정수 베이시스포인트(1/10,000) 맵 — 계산 전용.
+ * 부동소수 오차로 원 단위 절사가 1원 어긋나는 것을 막기 위해 정수 연산을 쓴다.
+ * (예: 3,000,000 × 0.009 는 26,999.999999999996으로 계산되어 floor가 26,999가 된다.
+ *  사업주분은 요율을 더해서 쓰기 때문에 더 심하다: 0.009 + 0.0045 = 0.013499999999999998
+ *  → floor 40,499. 정답 40,500. 2026-07-29 티켓 #10에서 이 경로로 전환.)
+ * ※ `Math.round`는 방어적 장치다. 현행 4개 요율(0.25/0.45/0.65/0.85%)은 × 10,000 이
+ *   전부 오차 없이 정확한 정수라(측정 확인) 반올림이 실제로 하는 일은 없다.
+ *   요율이 바뀌어 곱셈에 오차가 생기는 경우를 대비해 남겨 둔다.
+ * ⚠️ 0.5bp 단위 요율은 이 방식으로 표현할 수 없고 `Math.round`가 조용히 반올림한다.
+ *   이를 잡는 가드 단언이 `scripts/regression/engines.test.ts`에 있다.
+ * 요율 갱신 시 위 `EMPLOYMENT_STABILITY_RATE` 한 곳만 고치면 이 맵도 함께 갱신된다
+ * (요율 리터럴 이중 관리 금지).
+ */
+const EMPLOYMENT_STABILITY_BP: Record<BusinessSize, number> = {
+  under150: Math.round(EMPLOYMENT_STABILITY_RATE.under150 * 10_000),
+  over150Priority: Math.round(EMPLOYMENT_STABILITY_RATE.over150Priority * 10_000),
+  from150to1000: Math.round(EMPLOYMENT_STABILITY_RATE.from150to1000 * 10_000),
+  over1000: Math.round(EMPLOYMENT_STABILITY_RATE.over1000 * 10_000),
 };
 
 // -----------------------------------------------------------------------------
@@ -134,9 +156,11 @@ export function calculateFourInsurance(
   // STEP 4  고용보험
   //   근로자 = 실업급여분 0.9%
   //   사업주 = 실업급여 0.9% + 고용안정·직업능력개발(규모별)
-  const employmentEmployee = Math.floor(T * EMPLOYMENT_INSURANCE_RATE);
+  //   ※ 정수 bp 연산(위 상수 주석 참조): 실수 요율로 곱하면 절사가 1원 어긋난다.
+  const employmentEmployee = Math.floor((T * EMPLOYMENT_INSURANCE_BP) / 10_000);
   const employmentEmployer = Math.floor(
-    T * (EMPLOYMENT_INSURANCE_RATE + EMPLOYMENT_STABILITY_RATE[businessSize])
+    (T * (EMPLOYMENT_INSURANCE_BP + EMPLOYMENT_STABILITY_BP[businessSize])) /
+      10_000
   );
 
   // STEP 5  산재보험 = 계산 제외(전액 사업주·업종별) — 면책·안내만

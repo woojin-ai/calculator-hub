@@ -32,8 +32,29 @@ export const HEALTH_INSURANCE_RATE = 0.03595;
  */
 export const LONG_TERM_CARE_MULTIPLIER = 0.129457;
 
-/** 고용보험(실업급여) 근로자 요율 0.9% (실업급여분 총 1.8%, 근로자 절반). 출처: 고용노동부 */
+/**
+ * 고용보험(실업급여) 근로자 요율 0.9% (실업급여분 총 1.8%, 근로자 절반). 출처: 고용노동부
+ * ※ 이 값이 0.9%의 **단일 출처**다. 요율을 갱신할 때는 이 상수만 고친다.
+ *   실제 계산은 아래 `EMPLOYMENT_INSURANCE_BP`(이 상수에서 파생)가 담당한다
+ *   — 2026-07-29 기준 이 상수를 직접 읽는 표시 코드는 없고, 파생이 유일한 소비처다.
+ */
 export const EMPLOYMENT_INSURANCE_RATE = 0.009;
+
+/**
+ * 고용보험 요율의 정수 베이시스포인트(1/10,000) — 계산 전용, 위 실수 상수에서 파생.
+ * 부동소수 오차로 원 단위 절사가 1원 어긋나는 것을 막기 위해 정수 연산을 쓴다
+ * (예: 3,000,000 × 0.009 는 26,999.999999999996으로 계산되어 floor가 26,999가 된다.
+ *  정답은 27,000 — 2026-07-29 티켓 #10에서 이 경로로 전환.)
+ * ※ `Math.round`는 방어적 장치다. 현행 0.9%에서는 0.009 × 10,000 이 오차 없이
+ *   정확히 90이므로(측정 확인) 반올림이 실제로 하는 일은 없다. 요율이 바뀌어
+ *   이 곱셈에 오차가 생기는 경우를 대비해 남겨 둔다.
+ * ⚠️ 0.5bp 단위 요율(예: 0.925% → 92.5bp)은 이 방식으로 표현할 수 없고
+ *   `Math.round`가 조용히 93으로 반올림한다. 이를 잡는 가드 단언이
+ *   `scripts/regression/engines.test.ts`에 있다.
+ */
+export const EMPLOYMENT_INSURANCE_BP = Math.round(
+  EMPLOYMENT_INSURANCE_RATE * 10_000
+);
 
 /** 지방소득세 = 근로소득세 × 10% */
 export const LOCAL_INCOME_TAX_RATE = 0.1;
@@ -270,8 +291,9 @@ export function calculateSalary(input: SalaryInput): SalaryResult | null {
   const nationalPension = Math.floor(pensionBase * NATIONAL_PENSION_RATE);
   const healthInsurance = Math.floor(monthlyTaxable * HEALTH_INSURANCE_RATE);
   const longTermCare = Math.floor(healthInsurance * LONG_TERM_CARE_MULTIPLIER);
+  // 고용보험: 실수 요율 대신 파생 정수 bp로 곱한다(부동소수 절사 오차 방지, 상수 주석 참조)
   const employmentInsurance = Math.floor(
-    monthlyTaxable * EMPLOYMENT_INSURANCE_RATE
+    (monthlyTaxable * EMPLOYMENT_INSURANCE_BP) / 10_000
   );
   const insuranceTotal =
     nationalPension + healthInsurance + longTermCare + employmentInsurance;
