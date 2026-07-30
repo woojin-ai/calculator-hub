@@ -34,6 +34,11 @@ import { calculateElectricity } from "../../lib/electricity";
 import { convert } from "../../lib/units";
 import { calculateSavingsInterest } from "../../lib/savings-interest";
 import { calculateCarTax } from "../../lib/car-tax";
+import {
+  calculateAnnualLeaveAllowance,
+  computeAccruedLeaveDays,
+} from "../../lib/annual-leave-allowance";
+import { calculateWeeklyHolidayAllowance } from "../../lib/weekly-holiday-allowance";
 
 // -----------------------------------------------------------------------------
 // 미니 테스트 하네스 (프레임워크 없이 per-engine PASS 라인 + 총계)
@@ -85,13 +90,21 @@ const round2 = (n: number): number => Math.round(n * 100) / 100;
 
 // =============================================================================
 // 1) salary — 연봉 실수령액
-//    출처: lib/calculators.ts §interpretation(line 162, QA검증 = 엔진 실측)
+//    출처: lib/calculators.ts §interpretation(QA검증 = 엔진 실측)
 //          + planning/salary-net-calculator-content.md §1-4(연봉 4천만·부양1·비과세20만·자녀0)
-//    ※ 불일치(보고 대상): planning §1-4 표는 국민연금 148,810 / 건강 112,640 /
-//      장기요양 14,580 / 고용 28,200 / 합계 304,230 등 수기 근사치를 적어 두었으나
-//      엔진 실측(= 라이브 interpretation)은 148,817 / 112,643 / 14,582 / 28,199 /
-//      304,241 이다. 라이브 콘텐츠는 이미 엔진값으로 정정돼 있고 planning 문서만
-//      구식 → 문서 정정 필요. 여기서는 엔진 실측을 정답으로 잠근다.
+//
+//    ※ 해소 기록(2026-07-30, 티켓 #12): 이 자리에 있던 "planning 문서만 구식 →
+//      문서 정정 필요" 주석은 **주장 자체가 낡아 있었다.** 2026-07-30에 엔진을
+//      직접 실행해 planning §1-4 표(문서 128~132행)와 전 항목 대조한 결과:
+//        국민연금 148,817 / 건강 112,643 / 장기요양 14,582 / 고용 28,199 /
+//        4대보험 합계 304,241  → 문서·엔진 전 항목 일치(MATCH).
+//      즉 문서는 이미 정정돼 있었고 주석만 옛 상태에 멈춰 있었다. 고칠 문서는 없다.
+//      아래 앵커는 그대로 엔진 실측을 정답으로 잠근다(결론은 유효).
+//
+//    교훈: 주석에 적은 "사실 주장"은 유통기한이 있다. 문서 불일치를 발견하면
+//      주석에 적어 두지 말고 티켓으로 escalate해서 그 자리에서 종결할 것
+//      (티켓 #9와 동일 패턴이 세 번째 반복이었다). 주석에 남기는 수치는 반드시
+//      그때 직접 실행해 얻은 값만 적는다.
 // =============================================================================
 
 suite("salary", (t) => {
@@ -839,6 +852,194 @@ suite("car-tax", (t) => {
   t.eq(badYear.ok === false && badYear.error, "invalid-year", "연도 에러코드 invalid-year");
   // eco도 등록연도 방어는 동일 적용(배기량은 무시)
   t.eq(calculateCarTax({ kind: "eco", cc: 0, registerYear: 2027 }).ok, false, "eco 연도 초과 → invalid-year");
+});
+
+// =============================================================================
+// 15) annual-leave-allowance — 미사용 연차수당(월통상임금 ÷ 209 × 8 × 미사용일수)
+//     출처: planning/annual-leave-allowance-content.md §검산 기록
+//           + lib/calculators.ts interpretation/Q1(라이브 본문, 2026-07-29 QA 검증)
+//     기대값 취득: 2026-07-30 스크래치에서 lib/annual-leave-allowance.ts를 그대로
+//       import 해 실행한 출력을 그대로 옮겼다(수기 계산값 아님).
+//         calculateAnnualLeaveAllowance({monthlyWage:3_000_000,unusedDays:10,serviceYears:5})
+//         → {kind:"paid", amounts:{hourlyOrdinaryWage:14354, dailyOrdinaryWage:114833,
+//            allowance:1148325}, accrual:{accruedDays:17, underOneYear:false}}
+//
+//     ★ 이 스위트가 지키는 핵심 결함(기획 문서가 "재현성 리스크"로 지목한 것):
+//       총액을 **표시용 1일 통상임금(114,833)** 에 곱하면 1,148,330이 되어 라이브
+//       본문(1,148,325)과 5원 어긋난다. 총액은 전 정밀도 dailyRaw × 일수를 1회만
+//       반올림해야 한다. 앵커 A/B/C가 이 경로를 3중으로 잠근다.
+// =============================================================================
+
+suite("annual-leave", (t) => {
+  // 앵커 A(대표 = 라이브 본문·07-29 검증값): 월 통상임금 300만 · 미사용 10일 · 근속 5년
+  const a = calculateAnnualLeaveAllowance({
+    monthlyWage: 3_000_000,
+    unusedDays: 10,
+    serviceYears: 5,
+  });
+  assert.ok(a.ok, "AL-A ok");
+  if (a.ok) {
+    t.eq(a.kind, "paid", "A kind=paid(미사용>0)");
+    t.eq(a.amounts.hourlyOrdinaryWage, 14_354, "A 시간당 통상임금(3,000,000÷209=14,354.07)");
+    t.eq(a.amounts.dailyOrdinaryWage, 114_833, "A 1일 통상임금(×8=114,832.54 반올림)");
+    // 표시용 1일값 곱셈(114,833×10=1,148,330)이면 여기서 깨진다.
+    t.eq(a.amounts.allowance, 1_148_325, "A 연차수당 총액(전 정밀도 1회 반올림; 표시값 곱하면 1,148,330)");
+    t.eq(a.accrual?.serviceYears, 5, "A 근속연수 에코");
+    t.eq(a.accrual?.accruedDays, 17, "A 근속 5년 발생 연차 17일");
+    t.eq(a.accrual?.underOneYear, false, "A 1년 이상");
+  }
+
+  // 앵커 B(반올림 방향 — 시간당·1일 둘 다 올림 경계): 월 250만 · 7일
+  //   hourlyRaw 11,961.7224 → round 11,962 (floor면 11,961)
+  //   dailyRaw  95,693.7799 → round 95,694  (floor면 95,693)
+  //   총액 raw  669,856.4593 → 669,856. 표시값 곱(95,694×7)이면 669,858.
+  const b = calculateAnnualLeaveAllowance({ monthlyWage: 2_500_000, unusedDays: 7 });
+  assert.ok(b.ok, "AL-B ok");
+  if (b.ok) {
+    t.eq(b.amounts.hourlyOrdinaryWage, 11_962, "B 시간당(반올림; floor면 11,961)");
+    t.eq(b.amounts.dailyOrdinaryWage, 95_694, "B 1일(반올림; floor면 95,693)");
+    t.eq(b.amounts.allowance, 669_856, "B 총액(표시값 곱하면 669,858)");
+    t.eq(b.accrual, undefined, "B 근속 미입력 → accrual undefined");
+  }
+
+  // 앵커 C(반올림 방향 — 총액이 올림되는 일수): 월 300만 · 3일
+  //   총액 raw 344,497.6077 → round 344,498 (floor면 344,497 / 표시값 곱이면 344,499)
+  const c = calculateAnnualLeaveAllowance({ monthlyWage: 3_000_000, unusedDays: 3 });
+  assert.ok(c.ok, "AL-C ok");
+  if (c.ok) {
+    t.eq(c.amounts.allowance, 344_498, "C 총액 344,498(floor면 344,497·표시값 곱이면 344,499)");
+  }
+
+  // 앵커 D(반차 0.5일 — 소수 일수 허용): 총액 raw 57,416.2679 → 57,416
+  const d = calculateAnnualLeaveAllowance({ monthlyWage: 3_000_000, unusedDays: 0.5 });
+  assert.ok(d.ok, "AL-D ok");
+  if (d.ok) {
+    t.eq(d.kind, "paid", "D 0.5일도 paid");
+    t.eq(d.amounts.allowance, 57_416, "D 반차 0.5일 총액 57,416");
+  }
+
+  // 앵커 E(0일 = 게이트 아님, 중립 kind:"zero"): 통상임금은 그대로 산출, 총액만 0
+  const e = calculateAnnualLeaveAllowance({ monthlyWage: 3_000_000, unusedDays: 0 });
+  assert.ok(e.ok, "AL-E ok");
+  if (e.ok) {
+    t.eq(e.kind, "zero", "E 미사용 0일 → kind=zero(ok:false 아님)");
+    t.eq(e.amounts.hourlyOrdinaryWage, 14_354, "E 시간당은 그대로 산출");
+    t.eq(e.amounts.allowance, 0, "E 총액 0");
+  }
+
+  // 발생 연차일수 테이블 — 15 + floor((n−1)÷2), 상한 25 / 1년 미만 1개월당 1일·상한 11
+  //   ※ n=2 → 15 는 off-by-one 잠금이다. floor(n÷2)로 바뀌면 16이 되어 깨진다.
+  t.eq(computeAccruedLeaveDays(0.5), { accruedDays: 6, underOneYear: true }, "근속 0.5년 → 6일(1개월당 1일)");
+  t.eq(computeAccruedLeaveDays(0.99), { accruedDays: 11, underOneYear: true }, "근속 1년 미만 상한 11일");
+  t.eq(computeAccruedLeaveDays(1), { accruedDays: 15, underOneYear: false }, "근속 1년 → 15일");
+  t.eq(computeAccruedLeaveDays(2), { accruedDays: 15, underOneYear: false }, "근속 2년 → 15일(floor((n−1)/2) off-by-one 잠금)");
+  t.eq(computeAccruedLeaveDays(3), { accruedDays: 16, underOneYear: false }, "근속 3년 → 16일");
+  t.eq(computeAccruedLeaveDays(4), { accruedDays: 16, underOneYear: false }, "근속 4년 → 16일");
+  t.eq(computeAccruedLeaveDays(7), { accruedDays: 18, underOneYear: false }, "근속 7년 → 18일");
+  t.eq(computeAccruedLeaveDays(23), { accruedDays: 25, underOneYear: false }, "근속 23년 → 25일(상한)");
+  t.eq(computeAccruedLeaveDays(40), { accruedDays: 25, underOneYear: false }, "근속 40년 → 25일(상한 고정)");
+
+  // 계약: 무효 입력 → ok:false 판별 유니온 + 에러코드
+  const badWage = calculateAnnualLeaveAllowance({ monthlyWage: 0, unusedDays: 10 });
+  t.eq(badWage.ok, false, "통상임금 0 → ok:false");
+  t.eq(badWage.ok === false && badWage.error, "invalid-wage", "에러코드 invalid-wage");
+  const badDays = calculateAnnualLeaveAllowance({ monthlyWage: 3_000_000, unusedDays: -1 });
+  t.eq(badDays.ok === false && badDays.error, "invalid-unused-days", "음수 일수 → invalid-unused-days");
+  const badYears = calculateAnnualLeaveAllowance({ monthlyWage: 3_000_000, unusedDays: 10, serviceYears: -1 });
+  t.eq(badYears.ok === false && badYears.error, "invalid-service-years", "음수 근속 → invalid-service-years");
+  const nanWage = calculateAnnualLeaveAllowance({ monthlyWage: NaN, unusedDays: 10 });
+  t.eq(nanWage.ok === false && nanWage.error, "invalid-wage", "NaN 통상임금 → invalid-wage");
+});
+
+// =============================================================================
+// 16) weekly-holiday-allowance — 주휴수당((min(h,40) ÷ 40) × 8 × 시급)
+//     출처: planning/weekly-holiday-allowance-design.md §5 예시(주 20h·10,320원)
+//           + lib/blog.ts 라이브 근무형태 표(주 15/20/25/30/40h, 2026-07-29 QA 검증)
+//     기대값 취득: 2026-07-30 스크래치에서 lib/weekly-holiday-allowance.ts를 그대로
+//       import 해 실행한 출력을 그대로 옮겼다(수기 계산값 아님).
+//         calculateWeeklyHolidayAllowance({hourlyWage:10_320, weeklyHours:20})
+//         → {eligible:true, amounts:{appliedHours:20, capApplied:false,
+//            holidayConvertedHours:4, weeklyAllowance:41280, monthlyAllowance:179362,
+//            effectiveHourlyWage:12384, monthlyWageWithHoliday:1076170}}
+//     ※ 시급 상수(2026 최저시급 10,320원)는 lib/minimum-wage.ts가 단일 소스지만,
+//       엔진은 시급을 인자로만 받으므로 여기서는 리터럴을 쓴다(요율 상수 아님).
+// =============================================================================
+
+suite("weekly-holiday", (t) => {
+  // 앵커 A(대표 = 디자인 §5 예시·라이브 블로그 표): 시급 10,320원 · 주 20시간
+  const a = calculateWeeklyHolidayAllowance({ hourlyWage: 10_320, weeklyHours: 20 });
+  assert.ok(a.ok && a.eligible, "WH-A ok/eligible");
+  if (a.ok && a.eligible) {
+    t.eq(a.amounts.appliedHours, 20, "A 적용 소정근로시간 20");
+    t.eq(a.amounts.capApplied, false, "A 40시간 상한 미적용");
+    t.eq(a.amounts.holidayConvertedHours, 4, "A 주휴 환산 4시간((20÷40)×8)");
+    t.eq(a.amounts.weeklyAllowance, 41_280, "A 1주 주휴수당 41,280");
+    // raw 179,361.6 → 반올림 179,362. floor로 되돌리면 179,361.
+    t.eq(a.amounts.monthlyAllowance, 179_362, "A 월 환산 179,362(4.345주; floor면 179,361)");
+    t.eq(a.amounts.effectiveHourlyWage, 12_384, "A 주휴 포함 실질시급 12,384(명목×1.2)");
+    // raw 1,076,169.6 → 1,076,170.
+    t.eq(a.amounts.monthlyWageWithHoliday, 1_076_170, "A 주휴 포함 월 예상급여 1,076,170(floor면 1,076,169)");
+  }
+
+  // 앵커 B(지급 게이트 경계 15시간): 15h는 발생, 14.9h는 미발생
+  const b15 = calculateWeeklyHolidayAllowance({ hourlyWage: 10_320, weeklyHours: 15 });
+  assert.ok(b15.ok && b15.eligible, "WH-B15 ok/eligible(15h는 발생)");
+  if (b15.ok && b15.eligible) {
+    t.eq(b15.amounts.holidayConvertedHours, 3, "B15 주휴 환산 3시간");
+    t.eq(b15.amounts.weeklyAllowance, 30_960, "B15 1주 주휴수당 30,960");
+    t.eq(b15.amounts.monthlyAllowance, 134_521, "B15 월 환산 134,521");
+  }
+  const b149 = calculateWeeklyHolidayAllowance({ hourlyWage: 10_320, weeklyHours: 14.9 });
+  assert.ok(b149.ok, "WH-B14.9 ok");
+  t.eq(b149.ok && b149.eligible, false, "B14.9 초단시간(<15h) → eligible:false");
+  t.ok(b149.ok && b149.eligible === false && b149.info.weeklyHours === 14.9, "B14.9 게이트여도 info는 유지");
+
+  // 앵커 C(40시간 상한 + 실질시급 분모): 시급 10,320원 · 주 45시간
+  //   상한이 없으면 주휴수당이 (45÷40)×8×10,320 = 92,880으로 부풀고,
+  //   실질시급 분모를 clamp된 40으로 쓰면 12,384가 되어 12,155와 갈린다.
+  const c = calculateWeeklyHolidayAllowance({ hourlyWage: 10_320, weeklyHours: 45 });
+  assert.ok(c.ok && c.eligible, "WH-C ok/eligible");
+  if (c.ok && c.eligible) {
+    t.eq(c.amounts.appliedHours, 40, "C 적용 시간 40으로 상한");
+    t.eq(c.amounts.capApplied, true, "C capApplied");
+    t.eq(c.amounts.holidayConvertedHours, 8, "C 주휴 환산 8시간(상한)");
+    t.eq(c.amounts.weeklyAllowance, 82_560, "C 1주 주휴수당 82,560(상한 없으면 92,880)");
+    // raw 12,154.6667 → 12,155. 분모를 appliedHours(40)로 쓰면 12,384가 된다.
+    t.eq(c.amounts.effectiveHourlyWage, 12_155, "C 실질시급 12,155(분모=실제 45h; clamp면 12,384)");
+    t.eq(c.amounts.monthlyWageWithHoliday, 2_376_541, "C 주휴 포함 월 예상급여 2,376,541");
+  }
+
+  // 앵커 D(정확히 40시간 = 상한 미적용 경계)
+  const d = calculateWeeklyHolidayAllowance({ hourlyWage: 10_320, weeklyHours: 40 });
+  assert.ok(d.ok && d.eligible, "WH-D ok/eligible");
+  if (d.ok && d.eligible) {
+    t.eq(d.amounts.capApplied, false, "D h=40은 상한 미적용(초과가 아님)");
+    t.eq(d.amounts.weeklyAllowance, 82_560, "D 1주 주휴수당 82,560");
+    t.eq(d.amounts.monthlyAllowance, 358_723, "D 월 환산 358,723");
+    t.eq(d.amounts.effectiveHourlyWage, 12_384, "D 실질시급 12,384");
+  }
+
+  // 앵커 E(반올림 방향 — 주 단위 금액 자체가 소수인 경우): 시급 10,321원 · 주 18시간
+  //   weeklyRaw 37,155.6 → round 37,156 (floor면 37,155)
+  //   monthlyRaw 161,441.082 → 161,441 / effectiveRaw 12,385.0 근방
+  const e = calculateWeeklyHolidayAllowance({ hourlyWage: 10_321, weeklyHours: 18 });
+  assert.ok(e.ok && e.eligible, "WH-E ok/eligible");
+  if (e.ok && e.eligible) {
+    t.eq(e.amounts.holidayConvertedHours, 3.6, "E 주휴 환산 3.6시간");
+    t.eq(e.amounts.weeklyAllowance, 37_156, "E 1주 주휴수당 37,156(raw 37,155.6; floor면 37,155)");
+    t.eq(e.amounts.monthlyAllowance, 161_441, "E 월 환산 161,441");
+    t.eq(e.amounts.effectiveHourlyWage, 12_385, "E 실질시급 12,385");
+    t.eq(e.amounts.monthlyWageWithHoliday, 968_646, "E 주휴 포함 월 예상급여 968,646");
+  }
+
+  // 계약: 무효 입력 → ok:false 판별 유니온 + 에러코드
+  const badWage = calculateWeeklyHolidayAllowance({ hourlyWage: 0, weeklyHours: 20 });
+  t.eq(badWage.ok, false, "시급 0 → ok:false");
+  t.eq(badWage.ok === false && badWage.error, "invalid-wage", "에러코드 invalid-wage");
+  const badHours = calculateWeeklyHolidayAllowance({ hourlyWage: 10_320, weeklyHours: 0 });
+  t.eq(badHours.ok === false && badHours.error, "invalid-hours", "근로시간 0 → invalid-hours");
+  const nanWage = calculateWeeklyHolidayAllowance({ hourlyWage: NaN, weeklyHours: 20 });
+  t.eq(nanWage.ok === false && nanWage.error, "invalid-wage", "NaN 시급 → invalid-wage");
 });
 
 // =============================================================================
