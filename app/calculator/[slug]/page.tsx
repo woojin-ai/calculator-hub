@@ -10,6 +10,7 @@ import {
 import { buildCalculatorJsonLd } from "@/lib/calculator-jsonld";
 import { canonicalUrl } from "@/lib/site";
 import { buildOpenGraph } from "@/lib/og";
+import { FOCUS_RING_LINK_ROUNDED } from "@/lib/focusRing";
 import AgeCalculator from "@/components/AgeCalculator";
 import AnnualLeaveAllowanceCalculator from "@/components/AnnualLeaveAllowanceCalculator";
 import DdayCalculator from "@/components/DdayCalculator";
@@ -111,14 +112,20 @@ export default async function CalculatorPage({
           }}
         />
       )}
-      <nav className="mb-2 text-xs text-brand-text-secondary">
-        <Link href="/" className="hover:text-brand-primary">
+      <nav
+        aria-label="현재 위치"
+        className="-ml-3 mb-2 flex flex-wrap items-center gap-2 text-sm text-brand-text-secondary"
+      >
+        <Link
+          href="/"
+          className={`inline-flex min-h-9 items-center px-3 transition-colors hover:text-brand-primary ${FOCUS_RING_LINK_ROUNDED}`}
+        >
           홈
-        </Link>{" "}
-        /{" "}
+        </Link>
+        <span aria-hidden="true">/</span>
         <Link
           href={`/${calculator.category}`}
-          className="hover:text-brand-primary"
+          className={`inline-flex min-h-9 items-center px-3 transition-colors hover:text-brand-primary ${FOCUS_RING_LINK_ROUNDED}`}
         >
           {categoryInfo[calculator.category].title}
         </Link>

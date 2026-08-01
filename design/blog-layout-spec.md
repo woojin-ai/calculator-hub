@@ -1,4 +1,11 @@
-# 블로그 목록 + 글 상세 — UI 구성안 (v1.0, 2026-07-15)
+# 블로그 목록 + 글 상세 — UI 구성안 (v1.1, 2026-08-01)
+
+> **[v1.1 갱신 — 브레드크럼 정정]** 초판 §0 표와 §2-2가 브레드크럼을 `text-xs`(Caption 12px)로
+> 규정하면서 그 근거를 **구현 코드("계산기 상세 93행")에서 가져왔다.** 규범이 코드에서 역류한
+> 것이고, 그 결과 11~58×16px짜리 터치 타깃이 52개 라우트로 복제됐다(2026-08-01 코드 수정 완료).
+> 이번 판에서 ① 브레드크럼 스펙을 확정 사양으로 교체하고 ② 코드 역참조 표기를 제거했으며
+> ③ §3의 44px 선언과 실채택값 36px의 충돌을 명시했다. 브레드크럼 정본 정의는
+> `design-system.md` §3-5에 신설됐고, 이 문서는 그것을 참조한다. 나머지 레이아웃은 변경 없음.
 
 > 대상: `app/blog/page.tsx`(현재 빈 스텁) 및 신규 `app/blog/[slug]/page.tsx`
 > 본 문서는 `design/design-system.md`를 그대로 따르며, 기존 라이브 컴포넌트/토큰을 최대한
@@ -17,9 +24,17 @@
 | 섹션 제목(H2) | `RelatedCalculators`/`FaqAccordion`/`ResultInterpretation` | `text-xl font-bold text-brand-text` |
 | 카드 표면 | `CalculatorCard` 14행 | `rounded-xl border border-brand-border bg-brand-surface p-4 transition-all hover:border-brand-primary hover:shadow-md` |
 | 중립 배지(카테고리용) | `CalculatorCard`의 "준비 중" 배지 29행 | `rounded-full bg-brand-bg px-2 py-0.5 text-xs font-medium text-brand-text-secondary` |
-| Breadcrumb/보조 링크 | 계산기 상세 93행 | `text-xs text-brand-text-secondary` + `hover:text-brand-primary` |
+| Breadcrumb(현재 위치 내비) | `design-system.md` **§3-5 브레드크럼** | 컨테이너 `-ml-3 mb-2 flex flex-wrap items-center gap-2 text-sm text-brand-text-secondary` + 각 크럼 `inline-flex min-h-9 items-center px-3 …` (전문은 2-2) |
+| 보조 링크(하단 복귀 링크 등) | `design-system.md` §2 Body Small | `text-sm text-brand-text-secondary` + `hover:text-brand-primary` |
 | 빈 상태 박스 | 현재 blog 스텁 18행 | `rounded-xl border border-dashed border-brand-border bg-brand-surface p-8 text-center text-sm text-brand-text-secondary` |
 | 하단 "관련 계산기" 섹션 | `components/RelatedCalculators.tsx` **그대로** | (변경 없이 import) |
+
+> **[v1.1] 위 표의 "N행" 표기에 대하여.** 브레드크럼 행은 `design-system.md` §3-5 참조로 교체했다
+> (구 표기 "계산기 상세 93행"이 `text-xs` 결함을 규범으로 승격시킨 경로다). 나머지 행에 남은
+> "N행" 표기는 **행 번호가 이미 어긋났을 가능성이 있고**, `design-system.md` §3-5의 "스펙은 코드를
+> 인용하지 않는다" 규칙과도 충돌한다. 이 표를 전면 정리하려면 각 값의 정본을 `design-system.md`
+> §3에 컴포넌트로 승격시키는 별도 작업이 필요하므로, **이번 판에서는 손대지 않고 남겨 둔다**
+> (디자인팀 → 마스터 별건 제안). **새 스펙을 쓸 때 이 표기 방식을 따라 하지 말 것.**
 
 **두 페이지 모두 `max-w-3xl` 단일 컬럼**을 쓴다. 이유:
 - 상세 글은 장문 텍스트라 읽기 좋은 폭(약 65자)이 필요 → 계산기 상세와 동일한 `max-w-3xl`.
@@ -111,8 +126,24 @@
 
 ### 2-2. 상단 헤더 (Breadcrumb · 제목 · 메타)
 
-- **Breadcrumb**: 계산기 상세 93~104행 패턴 그대로. 항목만 교체:
-  `홈`(`/`) / `블로그`(`/blog`). `mb-2 text-xs text-brand-text-secondary`, 링크 hover `text-brand-primary`.
+- **Breadcrumb(현재 위치 내비)**: `design-system.md` **§3-5 브레드크럼** 컴포넌트 정의를 그대로 따른다.
+  이 문서는 항목만 지정한다 — `홈`(`/`) / `블로그`(`/blog`).
+
+  ```
+  <nav aria-label="현재 위치"
+       className="-ml-3 mb-2 flex flex-wrap items-center gap-2 text-sm text-brand-text-secondary">
+    <Link href="/" className="inline-flex min-h-9 items-center px-3 transition-colors hover:text-brand-primary {FOCUS_RING_LINK_ROUNDED}">홈</Link>
+    <span aria-hidden="true">/</span>
+    <Link href="/blog" className="(위와 동일)">블로그</Link>
+  </nav>
+  ```
+
+  - `text-sm`(Body Small) — **대화형 요소에 Caption 12px 스케일 금지**(§3-5 규칙). 이 문서 이전 판이
+    지정했던 `text-xs`는 스케일 오분류였으므로 **폐기**한다.
+  - 각 크럼은 `min-h-9`(36px) + `px-3`으로 터치 타깃을 확보한다. `홈`처럼 글자 폭 11px짜리 짧은
+    라벨도 약 37px 폭이 된다(패딩 없이 텍스트만 두면 타깃이 글자 폭 그대로 무너진다).
+  - `-ml-3`은 첫 크럼의 `px-3` 좌패딩 상쇄용 — 크럼 텍스트가 아래 H1과 같은 좌측 정렬선에 놓인다.
+  - 값의 근거·터치 타깃 기준의 정본은 `design-system.md` §3-5다. **여기서 클래스를 재선언·변형하지 않는다.**
 - **H1**: `text-2xl font-bold text-brand-text sm:text-[2rem]` (0장 표).
 - **메타 줄** (`mt-2 flex flex-wrap items-center gap-2 text-xs text-brand-text-secondary sm:text-sm`):
   - `<time dateTime>`: 발행일 (`tabular-nums`)
@@ -184,8 +215,22 @@ Tailwind 기본 브레이크포인트, 기존 `sm:` 관례를 그대로 따른�
 | 본문 문단 | `text-base`(16px, **축소 금지**) | 동일 16px (읽기 폭 max-w-3xl로 제어) |
 | 본문 소제목 h2 | `text-xl`(20px) | 동일 |
 | 내부링크 CTA 버튼 | `py-2`(높이 약 40px) | 동일. 터치 타겟 44px 확보 위해 `px-4 py-2` 유지 |
+| 브레드크럼(2-2) | `text-sm` + 각 크럼 `min-h-9`(36px) `px-3`, 크럼 간 `gap-2` | 동일(모바일·데스크톱 같은 값) |
 
-- 카드/CTA/링크의 터치 타겟은 모두 최소 44px 확보(카드는 `p-4`로 충분, CTA 버튼 `py-2`+텍스트).
+- **터치 타깃 기준 — 문서 간 충돌 있음(미해결, 별건 티켓)**
+  - `design-system.md` §4 원칙 3은 "터치 타겟 최소 44×44px"을 선언한다.
+  - 그러나 현재 라이브 사이트의 **내비게이션 링크류는 36px(`min-h-9`/`h-9`)를 하한으로 채택**해
+    구현돼 있다 — 2-2 브레드크럼(`/calculator/*` 16개 + `/blog/*` 36개 = **52개 라우트**),
+    `SiteHeader` nav(약 36px, `design/site-header-mobile-nav-spec.md` §8-4에 별건 제기됨),
+    기간 단위 토글(`h-9`, `design/loan-interest-calculator-ui-spec.md` §2-3(B)).
+  - **이 문서는 어느 쪽이 정본인지 정하지 않는다.** 44px 재정본화는 사이트 전 nav를 다시 그리는
+    결정이라 마스터가 별건 티켓으로 분리했다. 여기서는 사실만 기록한다 —
+    **선언값 44px / 내비류 실채택값 36px, 브레드크럼은 36px 계열.**
+  - 정본화 전까지 이 페이지의 실무 기준: **본문 조작 요소**(글 카드 `p-4`, 2-4 CTA 버튼 `px-4 py-2`,
+    입력류)는 위 44px 선언을 목표로 두고, **내비게이션 링크**(브레드크럼, 2-5 하단 복귀 링크)는
+    36px 하한을 따른다.
+  - 참고: 위 표의 CTA 버튼 행은 스스로 "높이 약 40px"이라 적으면서 같은 칸에서 "44px 확보"라고
+    말한다. 이 40 vs 44도 같은 별건에 딸린 미해결 항목이므로, 값을 임의로 바꾸지 않고 남겨 둔다.
 - 이미지 삽입 시(썸네일/본문 이미지) `w-full h-auto rounded-xl` + `loading="lazy"` 권장 —
   단, 현 스펙에는 이미지 영역을 필수로 두지 않는다(콘텐츠 준비 상황에 따라 기획팀 결정).
 
