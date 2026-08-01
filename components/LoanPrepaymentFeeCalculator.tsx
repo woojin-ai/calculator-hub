@@ -58,6 +58,26 @@ function formatFeeRate(rate: number): string {
   return Number.isInteger(rate) ? String(rate) : String(rate);
 }
 
+/**
+ * Tier② '계산식' 행 문자열 (비면제 전용).
+ *
+ * ★ 티켓 #19 (2026-07-31): 이 행의 좌변에 **표시용 반올림 잔존비율(formatRatio,
+ *   소수 1자리)** 을 쓰면 안 된다. 우변 `result.fee`는 엔진의 전정밀도
+ *   floor(A × f × R_m / (100 × D_m)) 값이라, 좌변을 그대로 곱해도 우변이 나오지
+ *   않는다(예: 1억·0.7%·잔존 24/36 → 66.7%로 곱하면 466,900원, 엔진은 466,666원).
+ *   그래서 좌변은 반올림 없는 **분수형 `R_m ÷ D_m`** 으로 적고, 엔진이 Math.floor라는
+ *   사실을 `(원 미만 절사)`로 명시한다.
+ *   선례: lib/blog.ts L4116 (2026-07-30, 동일 결함 클래스 F-3 수정).
+ *
+ * ※ 잔존비율 %는 바로 위 '잔존기간' 행과 요약 문구에 그대로 남아 있으므로
+ *   정보 손실은 없다(그 행의 자릿수 표기는 별도 티켓 #20 소관).
+ */
+export function formatPrepaymentFormulaLine(result: LoanPrepaymentResult): string {
+  return `${formatAmountKo(result.amount)} × ${formatFeeRate(result.feeRate)}% × ${
+    result.remainingMonths
+  } ÷ ${result.baseMonths} = ${formatWon(result.fee)}원(원 미만 절사)`;
+}
+
 /** 3년 캡 여부에 따른 면제기준기간 표현. */
 function capExpr(result: LoanPrepaymentResult): string {
   return result.isCapped
@@ -540,9 +560,7 @@ export default function LoanPrepaymentFeeCalculator() {
                   />
                   <ClauseRow
                     label="계산식"
-                    value={`${formatAmountKo(result.amount)} × ${formatFeeRate(
-                      result.feeRate
-                    )}% × ${formatRatio(result.ratio)}% = ${formatWon(result.fee)}원`}
+                    value={formatPrepaymentFormulaLine(result)}
                   />
                 </>
               )}

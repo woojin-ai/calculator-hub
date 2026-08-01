@@ -39,6 +39,8 @@ import {
   computeAccruedLeaveDays,
 } from "../../lib/annual-leave-allowance";
 import { calculateWeeklyHolidayAllowance } from "../../lib/weekly-holiday-allowance";
+// 표시 문자열 회귀(티켓 #19) — 엔진이 아니라 '렌더되는 문자열'을 잠근다.
+import { formatPrepaymentFormulaLine } from "../../components/LoanPrepaymentFeeCalculator";
 
 // -----------------------------------------------------------------------------
 // 미니 테스트 하네스 (프레임워크 없이 per-engine PASS 라인 + 총계)
@@ -338,9 +340,153 @@ suite("loan-prepayment", (t) => {
     t.eq(d.result.fee, 0, "D 수수료 0(면제)");
   }
 
+  // ---------------------------------------------------------------------------
+  // 앵커 E·F (2026-08-01 티켓 #21) — f의 이진부동소수 오차로 floor가 1원을 깎던 밴드
+  //
+  // 결함: 구식 `Math.floor((A * R_m * f) / (100 * D_m))`은 수학적 정답이 **정확히
+  //   정수**인 조합에서 중간값이 정답 바로 아래로 떨어져(예: 2362499.9999999995)
+  //   1원을 깎았다. QA 전수 스캔 1,332,000 조합 중 14,791건(1.110%)이 어긋났고
+  //   **전부 −1원**(항상 사용자에게 적게 표시). 처방 = 정수 bp + BigInt 산술.
+  //
+  // ★ 위 앵커 A~D는 이 밴드를 전부 비켜간다(QA 확인). A(0.5%)·B(0.65%)·C(1.2%)는
+  //   구식 float식으로도 같은 값이 나와서 결함을 통과시킨다. 그래서 두 개를 따로 둔다.
+  //   기대값은 엔진 출력 복사가 아니라 손계산이다:
+  //     E) 1,000만 × 0.7%  × 9 ÷ 12 = 70,000 × 0.75 = 52,500  (구 엔진 52,499)
+  //     F) 1,000만 × 0.35% × 9 ÷ 9  = 35,000 × 1    = 35,000  (구 엔진 34,999)
+  //   특히 F는 **잔존=기준(경과 0개월, 잔존비율 100%)** 이라 사용자가 암산으로
+  //   바로 잡아내는 형태였다.
+  // ---------------------------------------------------------------------------
+
+  // 앵커 E: 잔존 9/12
+  const e = calculateLoanPrepayment({ amount: 10_000_000, feeRate: 0.7, elapsedMonths: 3, totalMonths: 12 });
+  assert.ok(e.ok, "PRE-E ok");
+  if (e.ok) {
+    t.eq(e.result.remainingMonths, 9, "E 잔존 9개월");
+    t.eq(e.result.baseMonths, 12, "E 분모 12개월");
+    t.eq(e.result.fee, 52_500, "E 수수료 52,500(구 float식이면 52,499)");
+  }
+
+  // 앵커 F: 경과 0개월 → 잔존비율 100%. 수수료 = A × f 그대로여야 한다.
+  const fAnchor = calculateLoanPrepayment({ amount: 10_000_000, feeRate: 0.35, elapsedMonths: 0, totalMonths: 9 });
+  assert.ok(fAnchor.ok, "PRE-F ok");
+  if (fAnchor.ok) {
+    t.eq(fAnchor.result.ratio, 1, "F 잔존비율 100%(경과 0개월)");
+    t.eq(fAnchor.result.fee, 35_000, "F 수수료 35,000 = 1,000만 × 0.35%(구 float식이면 34,999)");
+  }
+
+  // ---------------------------------------------------------------------------
+  // 앵커 G·H (2026-08-01 티켓 #21 항목 D) — bp 변환의 **반올림 방향**을 잠근다
+  //
+  // ★ 요율을 아무거나 고르면 안 되는 자리다. 지우거나 요율을 "더 평범한 값"으로
+  //   바꾸지 말 것. 위 앵커 A~F의 요율(0.5·0.65·1.2·0.7·0.35·0)은 전부
+  //   `f × 10,000`이 부동소수 오차 없이 딱 떨어져서 **round·floor·ceil이 모두 같다.**
+  //   즉 A~F는 "정수 bp 산술로 바뀌었다"는 잡아도 "어느 방향으로 반올림하는가"는
+  //   전혀 잠그지 않는다. QA 변이 테스트에서 실제로 확인됐다:
+  //     Math.round → Math.floor 로 바꿔도 320 assertions ALL PASS (못 잡음)
+  //     Math.round → Math.ceil  로 바꿔도 320 assertions ALL PASS (못 잡음)
+  //   #21은 반올림 방향 때문에 1원이 깎인 티켓이다. 그 처방으로 도입한 새 반올림이
+  //   무보호면 티켓이 스스로를 부정한다. 그래서 방향에 민감한 요율을 일부러 고른다.
+  //
+  //   floor 변이가 bp를 깎는 2자리 요율 55종 / ceil 변이가 올리는 요율 60종이 있고
+  //   **전부 실존 은행 요율대**다(0.57·0.69·1.13·1.14·1.38·1.39·1.63·2.01% …).
+  //   1억·전액잔존이면 편차가 ±100원이며, floor 방향은 #21이 고친 것과 똑같은
+  //   클래스(사용자에게 적게 표시)의 결함이 된다.
+  //
+  //   G) f=0.57% → 0.57*10000 = 5699.999999999999 : round 5700 / floor 5699
+  //      → floor 변이 시 569,900원이 되어 이 앵커가 깨진다. (ceil은 5700으로 동일)
+  //   H) f=0.07% → 0.07*10000 = 700.0000000000001 : round 700 / ceil 701
+  //      → ceil 변이 시 70,100원이 되어 이 앵커가 깨진다. (floor는 700으로 동일)
+  //   두 방향이 서로 다른 요율에서만 갈리므로 **G·H 둘 다 있어야** 양방향이 잠긴다.
+  //
+  //   기대값은 엔진 출력 복사가 아니라 손계산이다(경과 0개월 = 잔존비율 100%):
+  //     G) 1억 × 0.57% = 570,000     H) 1억 × 0.07% = 70,000
+  // ---------------------------------------------------------------------------
+
+  const g = calculateLoanPrepayment({ amount: 100_000_000, feeRate: 0.57, elapsedMonths: 0, totalMonths: 36 });
+  assert.ok(g.ok, "PRE-G ok");
+  if (g.ok) {
+    t.eq(g.result.fee, 570_000, "G 수수료 570,000 = 1억 × 0.57%(bp를 floor로 내리면 569,900)");
+  }
+
+  const h = calculateLoanPrepayment({ amount: 100_000_000, feeRate: 0.07, elapsedMonths: 0, totalMonths: 36 });
+  assert.ok(h.ok, "PRE-H ok");
+  if (h.ok) {
+    t.eq(h.result.fee, 70_000, "H 수수료 70,000 = 1억 × 0.07%(bp를 ceil로 올리면 70,100)");
+  }
+
+  // G·H 비공허성 — 고른 요율이 **실제로 방향에 민감한지** 그 자리에서 증명한다.
+  //   SCALE은 엔진의 (모듈 private) FEE_RATE_SCALE과 같은 값이어야 한다. 엔진 배율을
+  //   바꾸면 아래가 깨지고, 그때는 새 배율에서 방향이 갈리는 요율로 G·H를 다시 골라야
+  //   한다. (값만 통과시키고 방향 보호는 사라지는 '조용한 무력화'를 막는 잠금)
+  //   먼저 엔진의 실효 배율을 **공개 API만으로 역산**한다. 소수 5자리 요율은 배율에
+  //   따라 결과가 갈리므로(0.12346% → 배율 1e4면 bp 1235 = 123,500원 / 1e5면 bp 12346
+  //   = 123,460원) 이 한 줄이 배율 변경을 감지한다. 이게 없으면 배율만 바꿔도 아래
+  //   방향 민감도가 조용히 사라지면서 G·H가 값만 통과시키는 껍데기가 된다(실측 확인함).
+  const probe = calculateLoanPrepayment({
+    amount: 100_000_000,
+    feeRate: 0.12346,
+    elapsedMonths: 0,
+    totalMonths: 36,
+  });
+  assert.ok(
+    probe.ok && probe.result.fee === 123_500,
+    "엔진 bp 배율이 10,000(해상도 0.0001%p)이어야 한다 — 배율을 바꿨다면 G·H 요율을 " +
+      "그 배율에서 round≠floor / round≠ceil 인 값으로 다시 골라야 앵커가 유효하다"
+  );
+
+  const SCALE = 10_000; // 위 프로브로 엔진 배율과 일치함을 확인한 값
+  assert.ok(
+    Math.floor(0.57 * SCALE) !== Math.round(0.57 * SCALE),
+    "G 요율 0.57%는 floor≠round 여야 앵커가 유효하다"
+  );
+  assert.ok(
+    Math.ceil(0.07 * SCALE) !== Math.round(0.07 * SCALE),
+    "H 요율 0.07%는 ceil≠round 여야 앵커가 유효하다"
+  );
+
+  // 앵커 비공허성 증명: 구(결함) float식을 그 자리에서 재현해 실제로 −1원임을 단언한다.
+  //   이 두 줄이 통과한다는 건 E·F가 "결함이 살아있으면 반드시 깨지는" 앵커라는 뜻이다.
+  //   (오차 0인 입력만 골라 통과시키는 무의미한 앵커 원천 차단 — 티켓 #19 스위트와 동일 원칙)
+  const legacyFloat = (A: number, f: number, R: number, D: number): number =>
+    Math.floor((A * R * f) / (100 * D));
+  t.eq(legacyFloat(10_000_000, 0.7, 9, 12), 52_499, "E 구 float식은 52,499(앵커 비공허)");
+  t.eq(legacyFloat(10_000_000, 0.35, 9, 9), 34_999, "F 구 float식은 34,999(앵커 비공허)");
+
   // 계약: 음수 입력 → invalid
   const bad = calculateLoanPrepayment({ amount: -1, feeRate: 0.5, elapsedMonths: 6, totalMonths: 24 });
   t.eq(bad.ok, false, "음수 금액 → invalid");
+
+  // ---------------------------------------------------------------------------
+  // 계약(티켓 #21): 비정수 금액·개월 → invalid-input
+  //   STEP 4가 BigInt 산술이라 비정수가 들어오면 BigInt()가 RangeError를 **던진다.**
+  //   엔진은 예외 대신 기존 에러 규약으로 떨어져야 한다. 가드가 빠지면 아래는
+  //   assertion 실패가 아니라 throw로 스위트가 FAIL 난다(그것도 회귀 신호).
+  //   현행 UI(금액 숫자마스크 · 개월 step="1")는 비정수를 못 만들지만 엔진 계약으로 못박는다.
+  // ---------------------------------------------------------------------------
+  const fracElapsed = calculateLoanPrepayment({ amount: 10_000_000, feeRate: 0.7, elapsedMonths: 6.5, totalMonths: 24 });
+  t.eq(fracElapsed.ok, false, "비정수 경과개월(6.5) → invalid(예외 아님)");
+  if (!fracElapsed.ok) t.eq(fracElapsed.error, "invalid-input", "에러코드 invalid-input");
+
+  const fracTotal = calculateLoanPrepayment({ amount: 10_000_000, feeRate: 0.7, elapsedMonths: 6, totalMonths: 24.5 });
+  t.eq(fracTotal.ok, false, "비정수 총기간(24.5) → invalid");
+
+  const fracAmount = calculateLoanPrepayment({ amount: 10_000_000.5, feeRate: 0.7, elapsedMonths: 6, totalMonths: 24 });
+  t.eq(fracAmount.ok, false, "비정수 금액 → invalid");
+
+  const nanAmount = calculateLoanPrepayment({ amount: NaN, feeRate: 0.7, elapsedMonths: 6, totalMonths: 24 });
+  t.eq(nanAmount.ok, false, "NaN 금액 → invalid");
+
+  const infRate = calculateLoanPrepayment({ amount: 10_000_000, feeRate: Infinity, elapsedMonths: 6, totalMonths: 24 });
+  t.eq(infRate.ok, false, "Infinity 수수료율 → invalid");
+
+  // f × 10,000 이 Infinity로 넘치는 요율(≳1e305)도 예외 없이 invalid로 떨어져야 한다.
+  const hugeRate = calculateLoanPrepayment({ amount: 10_000_000, feeRate: 1e305, elapsedMonths: 6, totalMonths: 24 });
+  t.eq(hugeRate.ok, false, "bp 변환 오버플로 요율 → invalid(예외 아님)");
+
+  // 정상 경계: 0원·0% 는 유효 입력이며 수수료 0 (거부 대상이 아님)
+  const zeroRate = calculateLoanPrepayment({ amount: 10_000_000, feeRate: 0, elapsedMonths: 6, totalMonths: 24 });
+  assert.ok(zeroRate.ok, "0% ok");
+  if (zeroRate.ok) t.eq(zeroRate.result.fee, 0, "0% → 수수료 0");
 });
 
 // =============================================================================
@@ -1040,6 +1186,133 @@ suite("weekly-holiday", (t) => {
   t.eq(badHours.ok === false && badHours.error, "invalid-hours", "근로시간 0 → invalid-hours");
   const nanWage = calculateWeeklyHolidayAllowance({ hourlyWage: NaN, weeklyHours: 20 });
   t.eq(nanWage.ok === false && nanWage.error, "invalid-wage", "NaN 시급 → invalid-wage");
+});
+
+// =============================================================================
+// 17) loan-prepayment '계산식' 표시행 — 좌변·우변 등식 정합 (2026-07-31 티켓 #19)
+//
+// 결함: components/LoanPrepaymentFeeCalculator.tsx의 '계산식' ClauseRow가
+//   좌변에 **표시용 반올림 잔존비율**(formatRatio = pct.toFixed(1))을 쓰면서
+//   우변에는 엔진의 **전정밀도** fee = floor(A × f × R_m / (100 × D_m))를 찍었다.
+//   → 사용자가 화면의 좌변을 그대로 곱해도 우변이 안 나온다(최대 수백 원 어긋남).
+//   블로그 본문 F-3(2026-07-30, lib/blog.ts L4116)과 동일 결함 클래스인데,
+//   이쪽은 계산기 결과화면이라 노출도가 더 높았다.
+//
+// 처방: 좌변을 반올림 없는 분수형 `R_m ÷ D_m`으로 바꾸고 `(원 미만 절사)` 명시.
+//
+// ★ 이 스위트의 설계 원칙 — "값이 무엇이다"가 아니라 "결함을 잡는가":
+//   앵커마다 3중으로 잠근다.
+//     (a) 렌더 문자열 완전 일치      → 반올림% 표기로 되돌리면 즉시 깨진다
+//     (b) 구조 가드 !/%\s*=/         → 좌변 끝이 "…% ="(반올림 비율) 형태면 깨진다
+//     (c) 좌변 정수산술 재계산 == fee → 분수형이 실제로 등식을 만족함을 증명
+//   추가로 (d) **앵커 비공허성 증명**: 같은 입력에서 구(결함) 좌변을 실제로
+//   계산해 fee와 어긋남을 단언한다. 오차가 0인 입력만 골라 "통과"시키는
+//   무의미한 앵커를 원천 차단한다(A1은 +234원, A2는 −38원으로 부호도 반대).
+//
+// 기대 문자열은 지어낸 게 아니라 2026-07-31 스크래치에서 실제 빌더를 실행해 얻었다.
+// =============================================================================
+
+suite("prepayment 계산식 표시", (t) => {
+  /**
+   * 좌변(분수형)을 부동소수 없이 정수 산술로 재계산: floor(A × f × R ÷ (100 × D)).
+   * BigInt로 곱해서 엔진의 float 곱셈 경로와 독립적으로 정답을 얻는다.
+   * (BigInt 리터럴 `100n`은 tsconfig target ES2017에서 금지 → BigInt() 생성자 사용.)
+   */
+  const exactFloor = (A: number, feeRateX100: number, R: number, D: number): number =>
+    Number(
+      (BigInt(A) * BigInt(feeRateX100) * BigInt(R)) / (BigInt(10_000) * BigInt(D))
+    );
+
+  /** 구(결함) 좌변 재현: 화면에 찍히던 반올림 잔존비율(소수 1자리)로 곱한 값. */
+  const buggyLeftSide = (A: number, feeRate: number, ratio: number): number => {
+    const shownPct = Number((ratio * 100).toFixed(1)); // = formatRatio 표시값
+    return Math.floor((A * feeRate * shownPct) / (100 * 100));
+  };
+
+  interface Anchor {
+    label: string;
+    input: { amount: number; feeRate: number; elapsedMonths: number; totalMonths: number };
+    feeRateX100: number;
+    expected: string;
+    /** 구 표기가 만들어내던 오차(원). 0이면 앵커가 공허하다는 뜻 → 단언으로 금지. */
+    legacyError: number;
+  }
+
+  const anchors: Anchor[] = [
+    {
+      // 블로그 F-3와 같은 시나리오(1억·0.7%·경과 12개월·만기 360 → 3년 캡).
+      // 구 표기: "1억원 × 0.7% × 66.7% = 466,666원" → 좌변을 곱하면 466,900원(+234).
+      label: "A1 1억·0.7%·잔존24/36",
+      input: { amount: 100_000_000, feeRate: 0.7, elapsedMonths: 12, totalMonths: 360 },
+      feeRateX100: 70,
+      expected: "1억원 × 0.7% × 24 ÷ 36 = 466,666원(원 미만 절사)",
+      legacyError: 234,
+    },
+    {
+      // 폼 기본값 경로(T=36, f=0.7). ratio 86.1…% → 구 좌변은 301,350원(−38).
+      // 오차 부호가 A1과 반대라 "항상 크게/작게 나온다"는 오해도 차단한다.
+      label: "A2 5천만·0.7%·잔존31/36",
+      input: { amount: 50_000_000, feeRate: 0.7, elapsedMonths: 5, totalMonths: 36 },
+      feeRateX100: 70,
+      expected: "5,000만원 × 0.7% × 31 ÷ 36 = 301,388원(원 미만 절사)",
+      legacyError: -38,
+    },
+    {
+      // 엔진 스위트 앵커 B(위 5번)와 완전히 같은 입력 — 엔진값 433,333 고정 상태에서
+      // 표시 문자열만 검증하므로, 엔진/표시 중 어느 쪽이 틀어져도 잡힌다.
+      label: "A3 1억·0.65%·잔존24/36",
+      input: { amount: 100_000_000, feeRate: 0.65, elapsedMonths: 12, totalMonths: 360 },
+      feeRateX100: 65,
+      expected: "1억원 × 0.65% × 24 ÷ 36 = 433,333원(원 미만 절사)",
+      legacyError: 217,
+    },
+  ];
+
+  for (const a of anchors) {
+    const out = calculateLoanPrepayment(a.input);
+    assert.ok(out.ok, `${a.label}: 엔진 ok`);
+    if (!out.ok) continue;
+    const r = out.result;
+    assert.ok(!r.isExempt, `${a.label}: 비면제 경로여야 한다`);
+
+    const line = formatPrepaymentFormulaLine(r);
+
+    // (a) 렌더 문자열 완전 일치
+    t.eq(line, a.expected, `${a.label} 계산식 렌더 문자열`);
+
+    // (b) 구조 가드: 좌변 끝이 "…% ="(= 반올림 잔존비율)이면 결함 복귀
+    t.ok(
+      !/%\s*=/.test(line),
+      `${a.label} 좌변에 반올림 잔존비율%가 없다(있으면 티켓 #19 회귀)`
+    );
+    t.ok(line.includes(` ÷ ${r.baseMonths} =`), `${a.label} 분수형 분모 ÷${r.baseMonths} 표기`);
+    t.ok(line.endsWith("원(원 미만 절사)"), `${a.label} 절사 라운딩 명시`);
+
+    // (c) 좌변(분수형)을 정수 산술로 재계산하면 우변 fee와 정확히 일치
+    t.eq(
+      exactFloor(r.amount, a.feeRateX100, r.remainingMonths, r.baseMonths),
+      r.fee,
+      `${a.label} 좌변 재계산 == 우변 fee(등식 성립)`
+    );
+
+    // (d) 앵커 비공허성: 구(결함) 좌변은 fee와 실제로 어긋난다
+    const legacy = buggyLeftSide(r.amount, r.feeRate, r.ratio);
+    t.eq(legacy - r.fee, a.legacyError, `${a.label} 구 표기 오차 ${a.legacyError}원(0이면 앵커 무효)`);
+    t.ok(legacy !== r.fee, `${a.label} 구 표기는 등식이 깨진다(앵커가 결함을 노출)`);
+  }
+
+  // 면제 분기는 이 빌더를 쓰지 않는다(화면은 "0원 (면제)" 고정). 경로 분리 잠금.
+  const exempt = calculateLoanPrepayment({
+    amount: 50_000_000,
+    feeRate: 1.2,
+    elapsedMonths: 40,
+    totalMonths: 360,
+  });
+  assert.ok(exempt.ok, "면제 케이스 ok");
+  if (exempt.ok) {
+    t.eq(exempt.result.isExempt, true, "면제 → 계산식 행 대신 '0원 (면제)' 행이 렌더된다");
+    t.eq(exempt.result.fee, 0, "면제 수수료 0");
+  }
 });
 
 // =============================================================================
