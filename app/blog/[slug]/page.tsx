@@ -19,7 +19,7 @@ import RelatedCalculators from "@/components/RelatedCalculators";
 import RelatedBlogPosts from "@/components/RelatedBlogPosts";
 import { SITE_URL } from "@/lib/site";
 import { buildOpenGraph } from "@/lib/og";
-import { FOCUS_RING_LINK_ROUNDED } from "@/lib/focusRing";
+import { FOCUS_RING_INSET, FOCUS_RING_LINK_ROUNDED } from "@/lib/focusRing";
 
 export function generateStaticParams() {
   return blogPosts.map((post) => ({ slug: post.slug }));
@@ -111,6 +111,73 @@ function renderSection(section: BlogSection, index: number) {
           {section.text}
         </aside>
       );
+    case "table": {
+      const align =
+        section.align ??
+        section.headers.map((_, i) => (i === 0 ? "left" : "right"));
+      const cap = `blog-table-${index}`;
+      return (
+        <figure key={index} className="my-6">
+          <div
+            role="region"
+            aria-labelledby={cap}
+            tabIndex={0}
+            className={`-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0 ${FOCUS_RING_INSET}`}
+          >
+            <table className="w-full min-w-max border-collapse text-sm">
+              <caption
+                id={cap}
+                className="mb-2 text-left text-sm text-brand-text-secondary"
+              >
+                {section.caption}
+              </caption>
+              <thead>
+                <tr className="border-b border-brand-border">
+                  {section.headers.map((h, i) => (
+                    <th
+                      key={i}
+                      scope="col"
+                      className={`px-3 py-2 font-semibold text-brand-text ${align[i] === "right" ? "text-right" : "text-left"}`}
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {section.rows.map((row, r) => (
+                  <tr key={r} className="border-b border-brand-border/60">
+                    {row.map((cell, c) =>
+                      c === 0 ? (
+                        <th
+                          key={c}
+                          scope="row"
+                          className={`px-3 py-2 font-medium text-brand-text ${align[c] === "right" ? "text-right" : "text-left"}`}
+                        >
+                          {cell}
+                        </th>
+                      ) : (
+                        <td
+                          key={c}
+                          className={`px-3 py-2 tabular-nums text-brand-text ${align[c] === "right" ? "text-right" : "text-left"}`}
+                        >
+                          {cell}
+                        </td>
+                      ),
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {section.note ? (
+            <figcaption className="mt-2 text-xs text-brand-text-secondary">
+              {section.note}
+            </figcaption>
+          ) : null}
+        </figure>
+      );
+    }
     case "calculatorCta": {
       const calc = getCalculatorBySlug(section.slug);
       if (!calc) return null; // 존재하지 않는 계산기 링크 금지(방어)
@@ -130,6 +197,14 @@ function renderSection(section: BlogSection, index: number) {
           </Link>
         </div>
       );
+    }
+    // BlogSection 유니온에 타입을 추가하고 case를 빠뜨리면 여기서 컴파일 에러가 난다.
+    // (없으면 undefined 반환 → 해당 블록만 조용히 사라진다)
+    default: {
+      // satisfies never = exhaustive check. 변수를 두면 no-unused-vars 경고가 나고
+      // 프로젝트 eslint 설정에 varsIgnorePattern이 없어 이 형태로 대체했다.
+      section satisfies never;
+      return null;
     }
   }
 }
