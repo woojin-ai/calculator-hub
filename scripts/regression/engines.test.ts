@@ -39,8 +39,12 @@ import {
   computeAccruedLeaveDays,
 } from "../../lib/annual-leave-allowance";
 import { calculateWeeklyHolidayAllowance } from "../../lib/weekly-holiday-allowance";
-// 표시 문자열 회귀(티켓 #19) — 엔진이 아니라 '렌더되는 문자열'을 잠근다.
-import { formatPrepaymentFormulaLine } from "../../components/LoanPrepaymentFeeCalculator";
+// 표시 문자열 회귀(티켓 #19·#22) — 엔진이 아니라 '렌더되는 문자열'을 잠근다.
+import {
+  formatPrepaymentFormulaLine,
+  formatRatio,
+  formatRemainingRatioLine,
+} from "../../components/LoanPrepaymentFeeCalculator";
 
 // -----------------------------------------------------------------------------
 // 미니 테스트 하네스 (프레임워크 없이 per-engine PASS 라인 + 총계)
@@ -1312,6 +1316,138 @@ suite("prepayment 계산식 표시", (t) => {
   if (exempt.ok) {
     t.eq(exempt.result.isExempt, true, "면제 → 계산식 행 대신 '0원 (면제)' 행이 렌더된다");
     t.eq(exempt.result.fee, 0, "면제 수수료 0");
+  }
+});
+
+// =============================================================================
+// 18) loan-prepayment 잔존비율 표기 — 자릿수(#16) · 등호 방향(#15) (티켓 #22)
+//
+// 표준: planning/ratio-percent-display-rules.md §2-2(정수 처리) · §2-3(등호 방향).
+//
+// #16 결함: formatRatio가 정수 판정을 **반올림 전** 값으로 해서, 9÷31 = 29.032%가
+//   화면에 "29.0%"로 찍혔다. 표준은 "반올림 후 정수면 소수점 생략" → "29%".
+//   (`.0`의 유무는 미관이 아니라 "반올림값 vs 정확값"의 신호라서 의미가 있다 — §2-2)
+//   처방: DsrCalculator.tsx:45 formatDsr와 동일하게 Math.round(x*10)/10 후 정수 판정.
+//
+// #15 결함: '잔존기간' 근거행이 항상 `=`였다. 우변이 반올림 표시값이면 등식이 거짓이라
+//   `≈`가 맞고, **정확히 나누어떨어질 때만** `=`다(18 ÷ 24 = 75%).
+//   처방: R×1000 % D === 0 (정수 산술) 로 분기.
+//
+// ★ 정확성 판정을 부동소수로 하면 안 되는 이유를 앵커로 못박는다:
+//   D ≤ 36 전 조합 중 11/20 · 7/25 · 14/25는 ratio*100이 55.00000000000001 등
+//   비정수로 나와서, 실수 비교식으로 짜면 **정확값인데 ≈** 로 오판한다.
+//   E5 앵커가 정확히 그 케이스이며 (c)에서 오판 재현까지 단언한다(비공허성).
+// =============================================================================
+
+suite("prepayment 잔존비율 표기(#15·#16)", (t) => {
+  /** 구(결함) formatRatio 재현 — 반올림 **전** 값으로 정수 판정. */
+  const legacyFormatRatio = (ratio: number): string => {
+    const pct = ratio * 100;
+    return Number.isInteger(pct) ? String(pct) : pct.toFixed(1);
+  };
+
+  // ── (1) formatRatio 표시값 (표준 §3-3 L200 제안 케이스 그대로) ──
+  t.eq(formatRatio(24 / 36), "66.7", "#16 24/36 → 66.7 (무한소수 → 1자리)");
+  t.eq(formatRatio(18 / 24), "75", "#16 18/24 → 75 (정확값, .0 금지)");
+  t.eq(formatRatio(9 / 31), "29", "#16 9/31 → 29 (반올림 후 정수 → 소수점 생략)");
+
+  // 비공허성: 9/31은 구 구현에서 실제로 "29.0"이었다(이 앵커가 결함을 노출한다).
+  t.eq(legacyFormatRatio(9 / 31), "29.0", "#16 구 구현은 9/31을 29.0으로 표기(앵커 유효)");
+  t.eq(legacyFormatRatio(24 / 36), "66.7", "#16 무한소수 케이스는 신·구 동일(표시 불변)");
+
+  // 반올림은 round-half-up(§2-2) — 절사/올림이면 깨진다.
+  t.eq(formatRatio(5 / 36), "13.9", "#16 5/36 = 13.888…% → 13.9 (절사면 13.8)");
+  t.eq(formatRatio(11 / 20), "55", "#16 11/20 → 55 (float 55.00000000000001에도 정수 표기)");
+
+  interface RatioAnchor {
+    label: string;
+    input: { amount: number; feeRate: number; elapsedMonths: number; totalMonths: number };
+    /** 기대 R_m ÷ D_m */
+    rd: [number, number];
+    expected: string;
+  }
+
+  const anchors: RatioAnchor[] = [
+    {
+      // ≈ 분기: 24 ÷ 36 = 66.666…% → 표시 66.7%는 근사다.
+      label: "E1 잔존24/36(무한소수)",
+      input: { amount: 100_000_000, feeRate: 0.7, elapsedMonths: 12, totalMonths: 360 },
+      rd: [24, 36],
+      expected: "24개월 ÷ 36개월 ≈ 66.7%",
+    },
+    {
+      // = 분기: 18 ÷ 24 = 75% 정확값(표준 §3-1 각주의 바로 그 예시).
+      label: "E2 잔존18/24(정확값)",
+      input: { amount: 100_000_000, feeRate: 0.7, elapsedMonths: 6, totalMonths: 24 },
+      rd: [18, 24],
+      expected: "18개월 ÷ 24개월 = 75%",
+    },
+    {
+      // #15 + #16 동시 검증: 29.032…% → 표시 "29"(소수점 생략) + 근사이므로 ≈.
+      //   구 코드였다면 "9개월 ÷ 31개월 = 29.0%" — 두 결함이 한 줄에 다 있었다.
+      label: "E3 잔존9/31(반올림 후 정수, 근사)",
+      input: { amount: 100_000_000, feeRate: 0.7, elapsedMonths: 22, totalMonths: 31 },
+      rd: [9, 31],
+      expected: "9개월 ÷ 31개월 ≈ 29%",
+    },
+    {
+      // = 분기(1자리 소수까지 정확): 27 ÷ 36 = 75%.
+      label: "E4 잔존27/36(정확값)",
+      input: { amount: 100_000_000, feeRate: 0.7, elapsedMonths: 9, totalMonths: 36 },
+      rd: [27, 36],
+      expected: "27개월 ÷ 36개월 = 75%",
+    },
+    {
+      // ★ float 함정 앵커: ratio*100 = 55.00000000000001. 정확값 55%이므로 `=`가 맞다.
+      //   정확성 판정을 실수 비교로 짜면 여기서 ≈로 뒤집힌다.
+      label: "E5 잔존11/20(float 함정, 정확값)",
+      input: { amount: 100_000_000, feeRate: 0.7, elapsedMonths: 9, totalMonths: 20 },
+      rd: [11, 20],
+      expected: "11개월 ÷ 20개월 = 55%",
+    },
+  ];
+
+  for (const a of anchors) {
+    const out = calculateLoanPrepayment(a.input);
+    assert.ok(out.ok, `${a.label}: 엔진 ok`);
+    if (!out.ok) continue;
+    const r = out.result;
+    assert.ok(!r.isExempt, `${a.label}: 비면제 경로여야 한다`);
+    t.eq([r.remainingMonths, r.baseMonths], a.rd, `${a.label} 엔진 R_m/D_m`);
+
+    const line = formatRemainingRatioLine(r);
+
+    // (a) 렌더 문자열 완전 일치
+    t.eq(line, a.expected, `${a.label} 잔존기간 행 렌더 문자열`);
+
+    // (b) 등호 부호가 정확성과 일치한다(정수 산술 정답과 대조)
+    const exact = (r.remainingMonths * 1000) % r.baseMonths === 0;
+    t.eq(line.includes(" = "), exact, `${a.label} = 는 정확히 나누어떨어질 때만`);
+    t.eq(line.includes(" ≈ "), !exact, `${a.label} ≈ 는 반올림 표시값일 때만`);
+
+    // (c) float 오판 재현 — 실수 비교로 짰다면 어떻게 되는가
+    const floatSaysExact = Number.isInteger(r.ratio * 100 * 10);
+    if (a.label.startsWith("E5")) {
+      t.eq(
+        floatSaysExact,
+        false,
+        `${a.label} 실수 비교는 정확값을 근사로 오판한다(정수 산술이어야 하는 이유)`
+      );
+      t.eq(exact, true, `${a.label} 정수 산술은 정확값으로 올바르게 판정`);
+    }
+  }
+
+  // 면제 분기는 이 빌더를 쓰지 않는다(화면은 '경과 …→ 잔존 0' + '0원 (면제)' 고정).
+  const exempt = calculateLoanPrepayment({
+    amount: 50_000_000,
+    feeRate: 0.7,
+    elapsedMonths: 36,
+    totalMonths: 36,
+  });
+  assert.ok(exempt.ok, "면제 케이스 ok");
+  if (exempt.ok) {
+    t.eq(exempt.result.isExempt, true, "잔존 0 → 잔존기간 행 대신 면제 행이 렌더된다");
+    t.eq(formatRatio(exempt.result.ratio), "0", "면제 ratio 0 → '0'(0.0 아님)");
   }
 });
 

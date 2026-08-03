@@ -47,10 +47,18 @@ function formatAmountKo(amount: number): string {
   return `${parts.join(" ")}원`;
 }
 
-/** 잔존비율(%)을 표기: 정수면 정수, 아니면 소수 1자리("66.7", "75"). */
-function formatRatio(ratio: number): string {
-  const pct = ratio * 100;
-  return Number.isInteger(pct) ? String(pct) : pct.toFixed(1);
+/**
+ * 잔존비율(%)을 표기: 정수면 정수, 아니면 소수 1자리("66.7", "75").
+ * **표시 전용. 이 값을 계산 등식에 사용 금지 — 등식은 분수형(R÷D).**
+ * (티켓 #22 / 표준 Batch 3 표 #17행. 이 규칙을 어긴 실사고가 티켓 #19다.)
+ *
+ * ★ 티켓 #22 / 표준 Batch 3 표 #16행 (표준 §2-2 L120-122): 정수 판정은 **반올림 이후** 값으로 한다.
+ *   반올림 전 원값으로 판정하면 9÷31 = 29.032%가 "29.0"으로 남는다(표준 표기는 "29").
+ *   모범 구현 `components/DsrCalculator.tsx:45` `formatDsr`와 같은 형태로 맞춘 것.
+ */
+export function formatRatio(ratio: number): string {
+  const rounded = Math.round(ratio * 100 * 10) / 10;
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
 }
 
 /** 수수료율(%)을 표기(불필요한 소수점 제거). */
@@ -76,6 +84,36 @@ export function formatPrepaymentFormulaLine(result: LoanPrepaymentResult): strin
   return `${formatAmountKo(result.amount)} × ${formatFeeRate(result.feeRate)}% × ${
     result.remainingMonths
   } ÷ ${result.baseMonths} = ${formatWon(result.fee)}원(원 미만 절사)`;
+}
+
+/**
+ * 표시용 잔존비율(소수 1자리 반올림)이 **정확값과 일치하는지** 판정한다.
+ *
+ * ★ 정수 산술로만 판정한다(부동소수 비교 금지). `ratio * 100`은 이진부동소수라
+ *   11 ÷ 20처럼 정확히 55%인 조합도 55.00000000000001이 되어, 실수 비교로는
+ *   정확값을 근사(≈)로 오판한다(D_m ≤ 36 전 조합 실측: 11/20 · 7/25 · 14/25).
+ *   R_m·D_m은 둘 다 정수(엔진 계약)이므로
+ *   "R/D×100이 소수 1자리로 딱 떨어짐 ⇔ R × 1000 % D === 0"으로 무오차 판정한다.
+ */
+function isRatioExactAt1Decimal(remainingMonths: number, baseMonths: number): boolean {
+  return baseMonths > 0 && (remainingMonths * 1000) % baseMonths === 0;
+}
+
+/**
+ * Tier② '잔존기간' 행 문자열 (비면제 전용): `24개월 ÷ 36개월 ≈ 66.7%`.
+ *
+ * ★ 티켓 #22 / 표준 Batch 3 표 #15행 (표준 §2-3 L139-142 '등호 방향'): 우변의 백분율은 표시용 반올림값이라
+ *   `=`로 쓰면 엄밀히 거짓이다(24 ÷ 36 = 66.666…%). 그래서 기본은 `≈`이고,
+ *   **정확히 나누어떨어지는 경우(18 ÷ 24 = 75%)만 `=`** 를 쓴다.
+ *   모범형: lib/calculators.ts L448 `24÷36 ≈ 66.7%`.
+ */
+export function formatRemainingRatioLine(result: LoanPrepaymentResult): string {
+  const sign = isRatioExactAt1Decimal(result.remainingMonths, result.baseMonths)
+    ? "="
+    : "≈";
+  return `${result.remainingMonths}개월 ÷ ${result.baseMonths}개월 ${sign} ${formatRatio(
+    result.ratio
+  )}%`;
 }
 
 /** 3년 캡 여부에 따른 면제기준기간 표현. */
@@ -554,9 +592,7 @@ export default function LoanPrepaymentFeeCalculator() {
                 <>
                   <ClauseRow
                     label="잔존기간"
-                    value={`${result.remainingMonths}개월 ÷ ${result.baseMonths}개월 = ${formatRatio(
-                      result.ratio
-                    )}%`}
+                    value={formatRemainingRatioLine(result)}
                   />
                   <ClauseRow
                     label="계산식"
