@@ -2,6 +2,9 @@
 
 import { useRef, useState, type FormEvent } from "react";
 import { calculateLoan, formatWon } from "@/lib/loan";
+// 표시 헬퍼는 순수 모듈(lib)에 있다 — 회귀 스위트가 클라이언트 컴포넌트를
+// import하지 않도록 하기 위함(티켓 #22 / 표준 Batch 3 #18).
+import { formatDsr, formatDsrFormulaLine } from "@/lib/ratio-display";
 import { INPUT_BASE as inputBase } from "@/lib/inputClass";
 
 type PeriodUnit = "year" | "month";
@@ -39,12 +42,6 @@ function formatAmountInput(raw: string): string {
   const digits = raw.replace(/[^\d]/g, "");
   if (digits === "") return "";
   return Number(digits).toLocaleString("ko-KR");
-}
-
-/** DSR(%) 표기: 소수 1자리 반올림, 정수면 소수점 생략("30.4", "40"). */
-function formatDsr(dsr: number): string {
-  const rounded = Math.round(dsr * 10) / 10;
-  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
 }
 
 /** 금액을 "약 ○○만원" / (1만원 미만) "약 ○,○00원" 형태로 반올림 표기(요약용). */
@@ -104,7 +101,11 @@ const BADGE_DISCLAIMER =
 /** 동적 결과 요약 (구간 분기, 단정·위협 금지 · 기획 §2·디자인 §3-6). */
 function getResultSummary(result: DsrResult): string {
   if (result.totalYear <= 0) {
-    return "상환 중인 대출이 없어 예상 DSR은 0.0%입니다. 신규 또는 기존 대출 정보를 입력하면 DSR이 계산됩니다.";
+    // 표준 §2-2 표 1행: 반올림 후 정수 + 단독 노출(문장) → 소수점 생략("0%").
+    // 대출 0이면 DSR은 **정확히** 0이라 `.0`은 "반올림값"이라는 거짓 신호가 된다
+    // ("`.0`의 유무는 미관이 아니라 '반올림값 vs 정확값'의 신호" — §2-2).
+    // 같은 결과 카드의 히어로·계산식 행은 이미 `0`/`0 %`라 표기도 어긋나 있었다. (QA F-2)
+    return "상환 중인 대출이 없어 예상 DSR은 0%입니다. 신규 또는 기존 대출 정보를 입력하면 DSR이 계산됩니다.";
   }
   const base = `연간 총 원리금상환액 ${formatApprox(
     result.totalYear
@@ -663,9 +664,11 @@ export default function DsrCalculator() {
               />
               <ClauseRow
                 label="DSR 계산식"
-                value={`${formatWon(result.totalYear)} ÷ ${formatWon(
-                  result.income
-                )} = ${formatDsr(result.dsr)} %`}
+                value={formatDsrFormulaLine(
+                  result.totalYear,
+                  result.income,
+                  result.dsr
+                )}
                 bold
               />
 

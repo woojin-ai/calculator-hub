@@ -8,6 +8,9 @@ import {
   type LoanPrepaymentResult,
 } from "@/lib/loan-prepayment";
 import { formatWon } from "@/lib/loan";
+// 표시용 반올림값의 정확성 판정(등호 방향 §2-3) — 순수 헬퍼는 lib에 둔다.
+// DSR 계산기와 같은 판정식을 공유하며, 실측 근거 주석도 그쪽에 있다.
+import { isRatioExactAt1Decimal } from "@/lib/ratio-display";
 import { INPUT_BASE as inputBase } from "@/lib/inputClass";
 
 interface FieldErrors {
@@ -54,7 +57,7 @@ function formatAmountKo(amount: number): string {
  *
  * ★ 티켓 #22 / 표준 Batch 3 표 #16행 (표준 §2-2 L120-122): 정수 판정은 **반올림 이후** 값으로 한다.
  *   반올림 전 원값으로 판정하면 9÷31 = 29.032%가 "29.0"으로 남는다(표준 표기는 "29").
- *   모범 구현 `components/DsrCalculator.tsx:45` `formatDsr`와 같은 형태로 맞춘 것.
+ *   모범 구현 `lib/ratio-display.ts` `formatDsr`와 같은 형태로 맞춘 것.
  */
 export function formatRatio(ratio: number): string {
   const rounded = Math.round(ratio * 100 * 10) / 10;
@@ -84,19 +87,6 @@ export function formatPrepaymentFormulaLine(result: LoanPrepaymentResult): strin
   return `${formatAmountKo(result.amount)} × ${formatFeeRate(result.feeRate)}% × ${
     result.remainingMonths
   } ÷ ${result.baseMonths} = ${formatWon(result.fee)}원(원 미만 절사)`;
-}
-
-/**
- * 표시용 잔존비율(소수 1자리 반올림)이 **정확값과 일치하는지** 판정한다.
- *
- * ★ 정수 산술로만 판정한다(부동소수 비교 금지). `ratio * 100`은 이진부동소수라
- *   11 ÷ 20처럼 정확히 55%인 조합도 55.00000000000001이 되어, 실수 비교로는
- *   정확값을 근사(≈)로 오판한다(D_m ≤ 36 전 조합 실측: 11/20 · 7/25 · 14/25).
- *   R_m·D_m은 둘 다 정수(엔진 계약)이므로
- *   "R/D×100이 소수 1자리로 딱 떨어짐 ⇔ R × 1000 % D === 0"으로 무오차 판정한다.
- */
-function isRatioExactAt1Decimal(remainingMonths: number, baseMonths: number): boolean {
-  return baseMonths > 0 && (remainingMonths * 1000) % baseMonths === 0;
 }
 
 /**
