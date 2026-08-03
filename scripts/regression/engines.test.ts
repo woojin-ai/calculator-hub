@@ -17,7 +17,13 @@
 
 import assert from "node:assert/strict";
 
-import { calculateSalary, EMPLOYMENT_INSURANCE_RATE } from "../../lib/salary";
+import {
+  calculateSalary,
+  EMPLOYMENT_INSURANCE_RATE,
+  LONG_TERM_CARE_RATE_PPM,
+  HEALTH_INSURANCE_TOTAL_RATE_PPM,
+  LONG_TERM_CARE_MULTIPLIER,
+} from "../../lib/salary";
 import {
   calculateFourInsurance,
   EMPLOYMENT_STABILITY_RATE,
@@ -114,6 +120,15 @@ const round2 = (n: number): number => Math.round(n * 100) / 100;
 //      즉 문서는 이미 정정돼 있었고 주석만 옛 상태에 멈춰 있었다. 고칠 문서는 없다.
 //      아래 앵커는 그대로 엔진 실측을 정답으로 잠근다(결론은 유효).
 //
+//    🔴 2026-08-04 티켓 #30(장기요양 승수 정정)으로 이 대조는 다시 깨졌다.
+//      장기요양 14,582 → **14,801**(승수 0.129457 → 9,448/71,900). 연쇄로 4대보험 합계·
+//      근로소득세(공제액 변동)·실수령액도 이동한다. planning §1-4 표(문서 128행)는
+//      아직 14,582/304,241/구식 실수령을 싣고 있어 **문서 정정 필요 = 마스터 보고 대상**
+//      (이번 회차 범위는 lib/ + 테스트 앵커까지로 못박혀 있어 문서는 손대지 않았다).
+//      ※ 같은 문서 표가 "112,643 × 12.9457% (= 보수월액 × 0.47240%)"라고 적어
+//        괄호 안에 정본 요율(0.4724% = 0.9448%÷2)을 이미 담고 있었다.
+//        3,133,333 × 0.4724% = 14,801원 → 문서 스스로 모순이었다.
+//
 //    교훈: 주석에 적은 "사실 주장"은 유통기한이 있다. 문서 불일치를 발견하면
 //      주석에 적어 두지 말고 티켓으로 escalate해서 그 자리에서 종결할 것
 //      (티켓 #9와 동일 패턴이 세 번째 반복이었다). 주석에 남기는 수치는 반드시
@@ -132,13 +147,15 @@ suite("salary", (t) => {
   t.eq(r!.monthlyTaxable, 3_133_333, "월 과세대상급여 T");
   t.eq(r!.nationalPension, 148_817, "국민연금(엔진 실측; 문서 §1-4=148,810 구식)");
   t.eq(r!.healthInsurance, 112_643, "건강보험(엔진 실측; 문서 §1-4=112,640 구식)");
-  t.eq(r!.longTermCare, 14_582, "장기요양(엔진 실측; 문서 §1-4=14,580 구식)");
+  // 장기요양: 112,643 × 9,448/71,900 = 14,801.82… → 14,801 (티켓 #30 이전 14,582)
+  t.eq(r!.longTermCare, 14_801, "장기요양(#30 정정; 구 승수 0.129457이면 14,582)");
   t.eq(r!.employmentInsurance, 28_199, "고용보험(엔진 실측; 문서 §1-4=28,200 구식)");
-  t.eq(r!.insuranceTotal, 304_241, "4대보험 합계");
-  t.eq(r!.incomeTax, 105_888, "근로소득세(월)");
-  t.eq(r!.localIncomeTax, 10_588, "지방소득세(월)");
-  t.eq(r!.monthlyNet, 2_912_616, "월 실수령액(약 291만, §1-4 범위 289~293만 내)");
-  t.eq(r!.annualNet, 34_951_392, "연 환산 실수령액(약 3,495만)");
+  t.eq(r!.insuranceTotal, 304_460, "4대보험 합계(#30: 304,241 → 304,460)");
+  // 세액도 이동한다 — 4대보험 연액이 특별소득공제로 들어가므로(파이프라인 ③→④)
+  t.eq(r!.incomeTax, 105_856, "근로소득세(월) (#30: 105,888 → 105,856)");
+  t.eq(r!.localIncomeTax, 10_585, "지방소득세(월) (#30: 10,588 → 10,585)");
+  t.eq(r!.monthlyNet, 2_912_432, "월 실수령액(#30: 2,912,616 → 2,912,432)");
+  t.eq(r!.annualNet, 34_949_184, "연 환산 실수령액(#30: 34,951,392 → 34,949,184)");
 
   // ---------------------------------------------------------------------------
   // 앵커 S2 — 고용보험 정수 bp 연산 잠금 (2026-07-29 티켓 #10)
@@ -160,8 +177,9 @@ suite("salary", (t) => {
   assert.ok(s2 !== null, "salary S2: 유효 입력이 null 반환");
   t.eq(s2!.monthlyTaxable, 3_000_000, "S2 월 과세대상급여 T");
   t.eq(s2!.employmentInsurance, 27_000, "S2 고용보험(정수 bp; float식이면 26,999)");
-  t.eq(s2!.insuranceTotal, 291_311, "S2 4대보험 합계");
-  t.eq(s2!.monthlyNet, 2_609_952, "S2 월 실수령액");
+  t.eq(s2!.longTermCare, 14_172, "S2 장기요양(107,850 × 9,448/71,900 = 14,172 정확값)");
+  t.eq(s2!.insuranceTotal, 291_522, "S2 4대보험 합계(#30: 291,311 → 291,522)");
+  t.eq(s2!.monthlyNet, 2_609_775, "S2 월 실수령액(#30: 2,609,952 → 2,609,775)");
 
   // 계약: 무효 입력은 null
   t.eq(calculateSalary({ annualSalary: 0, taxFreeMonthly: 0, dependents: 1, children: 0 }), null, "연봉 0 → null");
@@ -177,6 +195,15 @@ suite("salary", (t) => {
 //      D 근로자 소계 660,251→660,252 · 총합 1,338,003→1,338,004 (고용보험 62,999→63,000)
 //      A·C는 불변(2,000,000·5,000,000은 0.9%가 부동소수 오차 없이 떨어짐).
 //      B'(over150Priority) 신설 — 사업주 0.9%+0.45% float 합산 결함(40,499) 회귀 잠금.
+//    ※ 2026-08-04(티켓 #30) 장기요양 승수 정정(0.129457 → 9,448/71,900)으로 A~D의
+//      장기요양·소계·총합이 전부 이동했다. 근로자/사업주 각 +141~491원.
+//        A 근로자소계 194,207→194,348 · 총합 393,414→393,696
+//        B 장기요양 13,961→14,172 · 근로자소계 291,311→291,522 · 총합 590,122→590,544
+//        B' 근로자소계 291,311→291,522 · 사업주소계 304,811→305,022 · 총합 596,122→596,544
+//        C 근로자소계 485,519→485,870 · 총합 983,538→984,240
+//        D 근로자소계 660,252→660,743 · 총합 1,338,004→1,338,986
+//      planning/four-insurance-calculator-content.md §1-2·§1-4 및 §1-2가 지목하는
+//      `LONG_TERM_CARE_MULTIPLIER=0.129457` 문구는 아직 구식 = 문서 정정 필요(마스터 보고).
 // =============================================================================
 
 suite("four-insurance", (t) => {
@@ -185,21 +212,26 @@ suite("four-insurance", (t) => {
   // 앵커 A: T=2,000,000
   const a = calculateFourInsurance({ monthlyTaxable: 2_000_000, businessSize: under150 });
   assert.ok(a !== null, "4대보험 A null");
-  t.eq(a!.employeeTotal, 194_207, "A 근로자 소계");
-  t.eq(a!.employerTotal, 199_207, "A 사업주 소계");
-  t.eq(a!.grandTotal, 393_414, "A 총합");
+  // A의 장기요양은 손계산 앵커다: 건강 71,900원(절사 없음) × 9,448/71,900 = 9,448원 정확값.
+  //   = 보수 2,000,000 × 0.9448% ÷ 2 (법정 직접요율 경로와 원 단위까지 일치)
+  t.eq(a!.longTermCare.employee, 9_448, "A 장기요양 근로자(=200만×0.9448%÷2, 정확값)");
+  t.eq(a!.longTermCare.total, 18_896, "A 장기요양 총액(=200만×0.9448%)");
+  t.eq(a!.employeeTotal, 194_348, "A 근로자 소계(#30: 194,207 → 194,348)");
+  t.eq(a!.employerTotal, 199_348, "A 사업주 소계(#30: 199,207 → 199,348)");
+  t.eq(a!.grandTotal, 393_696, "A 총합(#30: 393,414 → 393,696)");
 
   // 앵커 B(대표): T=3,000,000
   const b = calculateFourInsurance({ monthlyTaxable: 3_000_000, businessSize: under150 });
   assert.ok(b !== null, "4대보험 B null");
   t.eq(b!.nationalPension.employee, 142_500, "B 국민연금 근로자");
   t.eq(b!.healthInsurance.employee, 107_850, "B 건강보험 근로자");
-  t.eq(b!.longTermCare.employee, 13_961, "B 장기요양 근로자");
+  t.eq(b!.longTermCare.employee, 14_172, "B 장기요양 근로자(#30: 13,961 → 14,172)");
+  t.eq(b!.longTermCare.total, 28_344, "B 장기요양 총액(=300만×0.9448%)");
   t.eq(b!.employmentInsurance.employee, 27_000, "B 고용보험 근로자");
   t.eq(b!.employmentInsurance.employer, 34_500, "B 고용보험 사업주(1.15%)");
-  t.eq(b!.employeeTotal, 291_311, "B 근로자 소계");
-  t.eq(b!.employerTotal, 298_811, "B 사업주 소계");
-  t.eq(b!.grandTotal, 590_122, "B 총합");
+  t.eq(b!.employeeTotal, 291_522, "B 근로자 소계(#30: 291,311 → 291,522)");
+  t.eq(b!.employerTotal, 299_022, "B 사업주 소계(#30: 298,811 → 299,022)");
+  t.eq(b!.grandTotal, 590_544, "B 총합(#30: 590,122 → 590,544)");
 
   // 앵커 B': T=3,000,000 · over150Priority(사업주 0.9%+0.45%=1.35%)
   //   float `0.009 + 0.0045`는 0.013499999999999998로 평가되어 floor가 40,499가 됐다.
@@ -211,15 +243,16 @@ suite("four-insurance", (t) => {
   assert.ok(bPriority !== null, "4대보험 B' null");
   t.eq(bPriority!.employmentInsurance.employee, 27_000, "B' 고용보험 근로자(0.9%)");
   t.eq(bPriority!.employmentInsurance.employer, 40_500, "B' 고용보험 사업주(1.35%)");
-  t.eq(bPriority!.employeeTotal, 291_311, "B' 근로자 소계(규모 무관, B와 동일)");
-  t.eq(bPriority!.employerTotal, 304_811, "B' 사업주 소계");
-  t.eq(bPriority!.grandTotal, 596_122, "B' 총합");
+  t.eq(bPriority!.employeeTotal, 291_522, "B' 근로자 소계(규모 무관, B와 동일)");
+  t.eq(bPriority!.employerTotal, 305_022, "B' 사업주 소계(#30: 304,811 → 305,022)");
+  t.eq(bPriority!.grandTotal, 596_544, "B' 총합(#30: 596,122 → 596,544)");
 
   // 앵커 C: T=5,000,000
   const c = calculateFourInsurance({ monthlyTaxable: 5_000_000, businessSize: under150 });
-  t.eq(c!.employeeTotal, 485_519, "C 근로자 소계");
-  t.eq(c!.employerTotal, 498_019, "C 사업주 소계");
-  t.eq(c!.grandTotal, 983_538, "C 총합");
+  t.eq(c!.longTermCare.employee, 23_620, "C 장기요양 근로자(=500만×0.9448%÷2, 정확값)");
+  t.eq(c!.employeeTotal, 485_870, "C 근로자 소계(#30: 485,519 → 485,870)");
+  t.eq(c!.employerTotal, 498_370, "C 사업주 소계(#30: 498,019 → 498,370)");
+  t.eq(c!.grandTotal, 984_240, "C 총합(#30: 983,538 → 984,240)");
 
   // 앵커 D: T=7,000,000 → 국민연금 상한 clamp(659만) 검증
   const d = calculateFourInsurance({ monthlyTaxable: 7_000_000, businessSize: under150 });
@@ -227,12 +260,104 @@ suite("four-insurance", (t) => {
   t.eq(d!.isPensionCapped, true, "D isPensionCapped");
   t.eq(d!.nationalPension.employee, 313_025, "D 국민연금 근로자(clamp 고정)");
   t.eq(d!.employmentInsurance.employee, 63_000, "D 고용보험 근로자(0.9%)");
-  t.eq(d!.employeeTotal, 660_252, "D 근로자 소계");
-  t.eq(d!.employerTotal, 677_752, "D 사업주 소계");
-  t.eq(d!.grandTotal, 1_338_004, "D 총합");
+  t.eq(d!.longTermCare.employee, 33_068, "D 장기요양 근로자(#30: 32,577 → 33,068)");
+  t.eq(d!.employeeTotal, 660_743, "D 근로자 소계(#30: 660,252 → 660,743)");
+  t.eq(d!.employerTotal, 678_243, "D 사업주 소계(#30: 677,752 → 678,243)");
+  t.eq(d!.grandTotal, 1_338_986, "D 총합(#30: 1,338,004 → 1,338,986)");
 
   // 계약: 무효 입력 → null
   t.eq(calculateFourInsurance({ monthlyTaxable: 0, businessSize: under150 }), null, "T=0 → null");
+});
+
+// =============================================================================
+// 2-b) 장기요양 승수 정본 잠금 (2026-08-04 티켓 #30)
+//
+// 결함: `LONG_TERM_CARE_MULTIPLIER = 0.129457`은 어느 연도의 어느 고시와도 대응되지
+//   않는 오기였다(2025년 정본 0.9182÷7.09 = 0.1295063과도 불일치). 라이브 계산기 2개가
+//   법정액보다 1.48% 적게 표시했다(보수 100만원 총액 9,306원 vs 법정 9,448원).
+//
+// 정본(2026-08-04 조문 대조):
+//   노인장기요양보험법 시행령 제4조     — 장기요양보험료율 100만분의 9,448 (= 0.9448%)
+//   국민건강보험법 시행령 제44조제1항  — 건강보험료율 1만분의 719 (= 7.19%)
+//   ⇒ "건강보험료 대비" 승수 = 9,448 / 71,900 = 0.131404728789…(공표 반올림 13.14%)
+//
+// 왜 정수 쌍인가: 실수 승수는 절사 경계에서 갈린다. 아래 앵커 L4가 그 자리에서 증명한다.
+//   (9자리 0.131404729조차 건강보험료 280,652원에서 +1원 어긋난다 — 전수 41,449건)
+// =============================================================================
+
+suite("장기요양 승수 정본(#30)", (t) => {
+  // --- 상수 정본 ---
+  t.eq(LONG_TERM_CARE_RATE_PPM, 9_448, "장기요양요율 = 100만분의 9,448(시행령 §4)");
+  t.eq(HEALTH_INSURANCE_TOTAL_RATE_PPM, 71_900, "건강보험료율 = 100만분의 71,900(시행령 §44①)");
+  t.eq(Number.isInteger(LONG_TERM_CARE_RATE_PPM), true, "분자는 정수여야 한다");
+  t.eq(Number.isInteger(HEALTH_INSURANCE_TOTAL_RATE_PPM), true, "분모는 정수여야 한다");
+  // 승수는 정수 쌍에서 파생돼야 한다(리터럴 재도입 금지 — #30 재발 방지)
+  t.eq(
+    LONG_TERM_CARE_MULTIPLIER,
+    9_448 / 71_900,
+    "승수는 9,448/71,900 파생값(리터럴이면 값이 갈린다)"
+  );
+  t.eq(round2(LONG_TERM_CARE_MULTIPLIER * 100), 13.14, "표시 요율 13.14%");
+  t.ok(LONG_TERM_CARE_MULTIPLIER !== 0.129457, "구 오기 0.129457 재도입 금지");
+
+  // 법정 직접요율 경로(참조 구현) — 근로자분 = 보수 × 0.9448% ÷ 2
+  const directEmployee = (T: number): number => Math.floor((T * 4_724) / 1_000_000);
+  const directTotal = (T: number): number => Math.floor((T * 9_448) / 1_000_000);
+  const care = (T: number): number =>
+    calculateFourInsurance({ monthlyTaxable: T, businessSize: "under150" })!.longTermCare
+      .employee;
+
+  // --- 앵커 L1: 손계산 앵커(건강보험료가 절사 없이 떨어지는 보수) ---
+  //   T=1,000,000 → 건강 35,950 → 35,950 × 9,448/71,900 = 4,724 정확값
+  //   구 승수였다면 4,653 (총액 9,306 vs 법정 9,448 — 라이브에 노출됐던 오차)
+  t.eq(care(1_000_000), 4_724, "L1 보수 100만 장기요양 근로자 = 100만×0.9448%÷2");
+  t.eq(care(1_000_000) * 2, 9_448, "L1 총액 = 100만 × 0.9448%(법정 직접요율과 일치)");
+  t.eq(Math.floor(Math.floor(1_000_000 * 0.03595) * 0.129457), 4_653, "L1 구 승수 재현 = 4,653(앵커 비공허)");
+
+  // --- 앵커 L2: 승수 경로 == 법정 직접요율 경로 (건강보험료 절사가 없는 전 구간) ---
+  //   건강보험료 근로자분 = T × 719/20,000 이므로 T가 20,000의 배수면 절사 손실이 0이다.
+  //   그 구간 100개 전수에서 근로자분이 법정 직접요율과 **원 단위까지 일치**해야 한다.
+  {
+    let mismatch = 0;
+    for (let T = 20_000; T <= 2_000_000; T += 20_000) {
+      if (care(T) !== directEmployee(T)) mismatch++;
+    }
+    t.eq(mismatch, 0, "L2 20,000원 배수 100건: 승수 경로 == 법정 직접요율(근로자분)");
+  }
+
+  // --- 앵커 L3: 잔여 편차의 상한 계약 ---
+  //   건강보험료 자체를 근로자/사업주 각각 floor 하므로(기존 설계, #30과 무관)
+  //   총액은 법정 직접요율보다 최대 2원 적을 수 있다. 절대 초과(+)는 없어야 한다.
+  //   ※ 이 편차는 승수 결함이 아니다: 완전정확 산술로 계산해도
+  //     floor(T×0.9448%÷2)×2 는 floor(T×0.9448%)와 50% 확률로 1원 갈린다.
+  {
+    let over = 0;
+    let worst = 0;
+    for (let T = 1_000_000; T <= 1_002_000; T++) {
+      const d = care(T) * 2 - directTotal(T);
+      if (d > 0) over++;
+      worst = Math.min(worst, d);
+    }
+    t.eq(over, 0, "L3 총액이 법정 직접요율을 초과하는 보수 없음(과다청구 금지)");
+    t.ok(worst >= -2, `L3 총액 하향 편차 2원 이내(실측 ${worst})`);
+  }
+
+  // --- 앵커 L4: 손으로 반올림한 리터럴 재도입 차단(비공허성 증명) ---
+  //   건강보험료 280,652원(= 월 보수 7,806,732원, 연봉 약 9,368만)에서
+  //   정수 쌍 36,878 / 9자리 실수 0.131404729 는 36,879 로 갈린다.
+  //   ⚠️ 이 앵커가 잡는 것은 "리터럴 재도입"이지 "곱셈 순서"가 아니다.
+  //     파생 double을 그대로 곱하는 변형 `floor(h × LONG_TERM_CARE_MULTIPLIER)`는
+  //     h=1~2,000만 전수에서 정수 쌍과 완전히 동일했다(2026-08-04 실측). 즉 그 변형은
+  //     이 스위트로 검출되지 않으며, 검출할 필요도 없다(결과가 같다).
+  t.eq(care(7_806_732), 36_878, "L4 보수 7,806,732원 장기요양 근로자(정수 쌍 산술)");
+  t.eq(
+    Math.floor(280_652 * 0.131404729),
+    36_879,
+    "L4 9자리 실수 승수는 36,879(+1원) — 정수 쌍이 아니면 여기서 갈린다"
+  );
+  t.eq(Math.floor((280_652 * 9_448) / 71_900), 36_878, "L4 정수 쌍 경로 36,878");
+  //   공표 반올림 0.1314도 못 쓴다: 건강보험료 71,900원에서 9,447(정본 9,448) — 1원 과소.
+  t.eq(Math.floor(71_900 * 0.1314), 9_447, "L4 공표 반올림 0.1314는 9,447(1원 과소)");
 });
 
 // =============================================================================

@@ -27,10 +27,45 @@ export const NATIONAL_PENSION_BASE_MAX = 6_590_000;
 export const HEALTH_INSURANCE_RATE = 0.03595;
 
 /**
- * 장기요양보험 = 건강보험료(근로자분) × 12.9457%
- * (2026 장기요양요율 0.9448% ÷ 건강보험료율 7.19% = 0.129457). 출처: 보건복지부
+ * 장기요양보험료율(소득 대비) = 0.9448% = 100만분의 9,448.
+ * 근거: 노인장기요양보험법 시행령 제4조(장기요양보험료율). 2026-08-04 조문 대조.
  */
-export const LONG_TERM_CARE_MULTIPLIER = 0.129457;
+export const LONG_TERM_CARE_RATE_PPM = 9_448;
+
+/**
+ * 건강보험료율(가입자+사용자 합계, 보수 대비) = 7.19% = 1만분의 719 = 100만분의 71,900.
+ * 근거: 국민건강보험법 시행령 제44조제1항(보험료율). 2026-08-04 조문 대조.
+ * ※ 위 `HEALTH_INSURANCE_RATE`(3.595%)는 이 값의 근로자 부담분(절반)이다.
+ *   여기서는 장기요양 승수의 **분모**로만 쓴다(요율 자체의 이중 정의가 아니다).
+ */
+export const HEALTH_INSURANCE_TOTAL_RATE_PPM = 71_900;
+
+/**
+ * 장기요양보험 = 건강보험료 × (9,448 / 71,900) = 13.1404728…% (복지부 공표 반올림 13.14%).
+ *
+ * ⚠️ 계산은 이 실수 상수가 아니라 위 **정수 쌍**(분자 `LONG_TERM_CARE_RATE_PPM` ÷
+ *   분모 `HEALTH_INSURANCE_TOTAL_RATE_PPM`)으로 한다. 이 상수는 표시·문서 대조용이며
+ *   2026-08-04 기준 이를 직접 읽는 코드는 회귀 테스트뿐이다.
+ *   - 정수 쌍이어야 승수 경로가 법정 직접요율 경로(보수 × 0.9448%)와 **정확히** 맞는다.
+ *     9자리 실수 `0.131404729`로 바꾸면 건강보험료 280,652원(월 보수 7,806,732원 =
+ *     연봉 약 9,368만)에서 36,878 → 36,879로 1원이 더 붙는다
+ *     (2026-08-04 h=1~2,000만 전수 실측: 41,449건 어긋나며 전부 +1원 과다.
+ *      공표 반올림 0.1314는 1,989만 건 어긋남 — 대부분 −1원 과소).
+ *     고용보험 `EMPLOYMENT_INSURANCE_BP`와 같은 부동소수 절사 결함 클래스다.
+ *   - 리터럴을 새로 쓰지 않고 정수 쌍에서 **파생**시켜, 요율 갱신 시 값이 갈라지는 것을 막는다.
+ *   - 정직한 단서(2026-08-04 실측): 이 파생 double을 그대로 곱하는 변형
+ *     `floor(h × LONG_TERM_CARE_MULTIPLIER)`는 h=1~2,000만(월 보수 약 5.6억까지)
+ *     전 구간에서 정수 쌍 경로와 **완전히 동일**했다. 즉 정수 쌍이 막아 주는 것은
+ *     "곱셈 순서"가 아니라 **손으로 반올림한 리터럴의 재도입**이다(#30의 실제 사고 형태).
+ *     그래도 정수 쌍을 쓰는 이유: 법정 요율과의 일치가 측정이 아니라 **정의로** 보장된다.
+ *
+ * 🔴 2026-08-04 티켓 #30 정정: 종전 값 `0.129457`은 어느 연도의 어느 고시와도
+ *   대응되지 않는 오기였다(2025년 정본 0.9182÷7.09 = 0.1295063과도 불일치).
+ *   같은 자리 주석이 입력값 0.9448%·7.19%를 정확히 적어 놓고 몫만 틀렸다.
+ *   → 승수 경로가 법정액보다 1.48% 적게 나왔다(보수 100만원 기준 총액 9,306원 vs 9,448원).
+ */
+export const LONG_TERM_CARE_MULTIPLIER =
+  LONG_TERM_CARE_RATE_PPM / HEALTH_INSURANCE_TOTAL_RATE_PPM;
 
 /**
  * 고용보험(실업급여) 근로자 요율 0.9% (실업급여분 총 1.8%, 근로자 절반). 출처: 고용노동부
@@ -290,7 +325,11 @@ export function calculateSalary(input: SalaryInput): SalaryResult | null {
   );
   const nationalPension = Math.floor(pensionBase * NATIONAL_PENSION_RATE);
   const healthInsurance = Math.floor(monthlyTaxable * HEALTH_INSURANCE_RATE);
-  const longTermCare = Math.floor(healthInsurance * LONG_TERM_CARE_MULTIPLIER);
+  // 장기요양: 반올림한 실수 승수 대신 정수 분자/분모로 곱한다
+  //   — 법정 직접요율(보수 × 0.9448%)과의 일치를 정의로 보장한다(상수 주석 참조)
+  const longTermCare = Math.floor(
+    (healthInsurance * LONG_TERM_CARE_RATE_PPM) / HEALTH_INSURANCE_TOTAL_RATE_PPM
+  );
   // 고용보험: 실수 요율 대신 파생 정수 bp로 곱한다(부동소수 절사 오차 방지, 상수 주석 참조)
   const employmentInsurance = Math.floor(
     (monthlyTaxable * EMPLOYMENT_INSURANCE_BP) / 10_000

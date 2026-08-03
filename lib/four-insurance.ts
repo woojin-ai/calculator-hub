@@ -22,7 +22,8 @@ import {
   NATIONAL_PENSION_BASE_MIN,
   NATIONAL_PENSION_BASE_MAX,
   HEALTH_INSURANCE_RATE,
-  LONG_TERM_CARE_MULTIPLIER,
+  LONG_TERM_CARE_RATE_PPM,
+  HEALTH_INSURANCE_TOTAL_RATE_PPM,
   EMPLOYMENT_INSURANCE_BP,
   floorTo1000,
 } from "@/lib/salary";
@@ -149,9 +150,17 @@ export function calculateFourInsurance(
   const healthEmployee = Math.floor(T * HEALTH_INSURANCE_RATE);
   const healthEmployer = Math.floor(T * HEALTH_INSURANCE_RATE);
 
-  // STEP 3  장기요양 (각자의 건강보험료 × 12.9457%)
-  const careEmployee = Math.floor(healthEmployee * LONG_TERM_CARE_MULTIPLIER);
-  const careEmployer = Math.floor(healthEmployer * LONG_TERM_CARE_MULTIPLIER);
+  // STEP 3  장기요양 (각자의 건강보험료 × 9,448/71,900 = 13.1404728…%)
+  //   근거: 노인장기요양보험법 시행령 제4조(0.9448% = 100만분의 9,448)
+  //       ÷ 국민건강보험법 시행령 제44조제1항(7.19% = 1만분의 719). 2026-08-04 조문 대조.
+  //   ※ 정수 분자/분모 연산(상수 주석 참조): 손으로 반올림한 실수 승수(0.1314·0.131404729 등)로
+  //     곱하면 절사가 1원 어긋난다. (2026-08-04 티켓 #30: 종전 승수 0.129457은 근거 없는 오기였다.)
+  const careEmployee = Math.floor(
+    (healthEmployee * LONG_TERM_CARE_RATE_PPM) / HEALTH_INSURANCE_TOTAL_RATE_PPM
+  );
+  const careEmployer = Math.floor(
+    (healthEmployer * LONG_TERM_CARE_RATE_PPM) / HEALTH_INSURANCE_TOTAL_RATE_PPM
+  );
 
   // STEP 4  고용보험
   //   근로자 = 실업급여분 0.9%
