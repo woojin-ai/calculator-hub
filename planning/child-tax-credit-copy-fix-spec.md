@@ -556,7 +556,7 @@ G3 근거: 카드뉴스는 **미발행 상태**(이미지·발행 사용자 승�
 | R5 | 금지 표현 미사용 (§1-4, 표준 ㋎) | `rg "20세 미만\|20세 이상\|8세부터\|나이 무관\|나이 제한 없음\|21세 미만" components/ lib/` | **0회** | **0회 유지** |
 | R6 | 기획안 FAQ3 ↔ 라이브 FAQ3 축자 일치 | `rg -c "손자녀를 키우는 조손가정도" lib/calculators.ts planning/salary-net-calculator-content.md` | 양쪽 **0회** (현재 드리프트 상태) | 양쪽 **각 1회** |
 | R7 | FAQ 슬라이싱·개수 상한 부재 (K3 안전성) | `rg "faq\.(slice\|length)\|faq\.map" lib/` | `lib/calculator-jsonld.ts:69` `faq.length > 0`(가드) · `:72` `faq.map`(전량 순회). **상한 없음** | 동일 (코드 무변경) |
-| R8 | CTC 금액 리터럴 무변경 | `rg "250_000\|550_000\|400_000" lib/salary.ts` | L298·L300·L302 **3건** | **동일 3건**. `git diff lib/salary.ts`는 주석(S1·S2·S3)만 |
+| R8 | CTC 금액 리터럴 무변경 | `rg "250_000\|550_000\|400_000" lib/salary.ts` | L298·L300·L302 **3건** (패치 전 실측 — 4열 정의대로)<br>※ 2026-08-05 티켓 #38 주석: 패치 후 S1 주석 1줄 삽입으로 **L299·L301·L303**으로 +1 이동, **건수 3건 불변**. 종전 기재는 **오기가 아니라 시점 차이**다(QA 반증 채택). | **동일 3건**. `git diff lib/salary.ts`는 주석(S1·S2·S3)만 |
 | R9 | 회귀 테스트 무영향 | `rg "자녀" scripts/regression/engines.test.ts` | L113·L193 **주석 2건뿐**(기대값 아님) | 동일, 파일 무변경 |
 | R10 | 라벨 실렌더 **1줄**(2026-08-05 실측으로 정정 — 아래 "패치 후 기대" 열의 2줄 예측은 **반증됨**) · 좌우 셀렉트 상단 오프셋 일치 · CTA 첫 화면 내 | **마스터 §7 DOM 실측** — `preview_start` + dev 서버 + `javascript_tool`로 ① `#children` 라벨 `getBoundingClientRect().height`, ② `#dependents`/`#children` 셀렉트 `.top` 동치, ③ 제출 버튼 `.bottom` ≤ 667, ④ C7 `<p>` `.height`(2줄=32px 예상) 확인 | **미측정** (rev.1의 "1줄 약 10자" 산술 추정은 §3-0에서 폐기) | ~~① 40px(2줄)~~ → **실측 ① 라벨 1줄 137.9px, 박스는 `min-h-10`으로 40px 유지** · ② 동일 · ③ **반증**(CTA는 변경 전부터 이미 첫 화면 밖) · ④ 32px |
 | R11 | FAQ 답변 속 라벨 인용이 실제 라벨과 축자 일치 | `rg -o "8세 이상 자녀·손자녀 수" components/ lib/calculators.ts` | **0회** | **3회** — tsx 2(라벨+주석) + calculators.ts K3 1 |
