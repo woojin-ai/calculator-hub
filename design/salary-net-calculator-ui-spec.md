@@ -183,7 +183,7 @@ bg-gradient-to-br from-emerald-50 to-white p-4 sm:p-6`. 대출 결과 카드와 
                                             tabular-nums (Accent 아님)
 세전 연봉 4,000만원에서 4대 보험 약        ← 요약 문구(동적): mt-2 text-sm text-brand-text-secondary
 30만원과 세금 약 12만원이 공제된 금액입니다.   (기획 §2 1문단을 입력값 기반으로 동적 축약, §3-5)
-                                            ※ 앵커(연봉4천/부양1/비과세20만)의 월 세금 합계=116,476원 → formatApprox 반올림 시 "약 12만원"(엔진 실측 일치, 2026-07-14 문서 typo 수정)
+                                            ※ 앵커(연봉4천/부양1/비과세20만)의 월 세금 합계=116,441원 → formatApprox 반올림 시 "약 12만원"(엔진 실측 일치, 2026-07-14 문서 typo 수정)
 ```
 
 - 히어로/보조 대표 모두 `tabular-nums`, 천단위 콤마 필수.
@@ -405,7 +405,7 @@ Tier ③ [세금] 소계 아래 `text-xs text-brand-text-secondary` 1줄(§3-4).
 **개발팀 전달 사항**
 - 신규 `components/SalaryNetCalculator.tsx`, `lib/salary.ts` 구현. `CALCULATOR_COMPONENTS`
   매핑 추가, `lib/calculators.ts` 콘텐츠 확보 후 `status: "live"` 전환.
-- 기획 §8-2 파이프라인 순서(4대보험→소득세), §8-3 국민연금 clamp·천원절사, 장기요양 12.9457%,
+- 기획 §8-2 파이프라인 순서(4대보험→소득세), §8-3 국민연금 clamp·천원절사, 장기요양 9,448/71,900(≈13.14%),
   §8-5 요율 상수 모듈화 준수.
 - 연봉·비과세액 천단위 콤마(`formatPrincipalInput` 재사용), 결과 전 금액 `formatWon`.
 - §2-2 셀렉트 채택 시 §2-3 자녀 옵션 동적 캡(부양가족−1) 구현. 숫자입력 대체 시 제출 시
