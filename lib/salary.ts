@@ -168,7 +168,7 @@ export interface SalaryInput {
   taxFreeMonthly: number;
   /** 부양가족 수(본인 포함), 최소 1 */
   dependents: number;
-  /** 8~20세 자녀 수, 0 이상 */
+  /** 자녀세액공제 대상 인원수(8세 이상 자녀·손자녀, 장애인은 20세 초과도 포함 — 소득세법 제59조의2제1항, 제50조제1항제3호), 0 이상 */
   children: number;
 }
 
@@ -236,7 +236,7 @@ function applyBrackets(
  * 근로소득세(월)·지방소득세(월)를 근사 공식으로 산출한다.
  * @param annualTaxable 연 과세대상급여 G (= 연봉 − 월비과세×12, 0 이상)
  * @param dependents 부양가족 수 n (본인 포함)
- * @param children 8~20세 자녀 수 c
+ * @param children 자녀세액공제 대상 인원수 c (8세 이상 자녀·손자녀 — 소득세법 제59조의2제1항)
  * @param annualInsurance 4대보험 근로자부담 연액(연금·건강·장기요양·고용 합계)
  * @param annualPension 국민연금 근로자부담 연액(연금보험료공제용)
  */
@@ -291,6 +291,7 @@ function calculateIncomeTax(
   const WTC = Math.min(creditAmount, creditCap);
 
   // STEP 8  자녀세액공제 CTC (연)
+  // 근거: 소득세법 제59조의2제1항 각 호 (1명 25만원 / 2명 55만원 / 3명 이상 55만원 + 2명 초과 1명당 40만원)
   let CTC: number;
   if (children <= 0) {
     CTC = 0;

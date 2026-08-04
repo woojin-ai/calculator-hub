@@ -84,7 +84,7 @@ export default function SalaryNetCalculator() {
 
   const resultRef = useRef<HTMLDivElement | null>(null);
 
-  // 자녀 옵션 캡 = 부양가족 − 1 (자녀 ≤ 부양가족 − 1)
+  // 자녀·손자녀 옵션 캡 = 부양가족 − 1 (자녀·손자녀 ≤ 부양가족 − 1)
   const childrenCap = Math.max(0, dependents - 1);
   const childrenDisabled = childrenCap === 0;
   const childrenOptions = Array.from({ length: childrenCap + 1 }, (_, i) => i);
@@ -210,7 +210,7 @@ export default function SalaryNetCalculator() {
             </p>
           </div>
 
-          {/* 3. 부양가족 수 / 8~20세 자녀 수 (2열) */}
+          {/* 3. 부양가족 수 / 8세 이상 자녀·손자녀 수 (2열) */}
           <div className="grid grid-cols-2 gap-3 sm:gap-4">
             <div className="flex flex-col gap-1.5">
               <label
@@ -240,7 +240,7 @@ export default function SalaryNetCalculator() {
                 </span>
               </div>
               <p className="text-xs text-brand-text-secondary">
-                본인과 배우자·자녀·부모 등 부양하는 가족의 수입니다(본인 포함 최소 1명).
+                본인과 배우자·자녀·손자녀·부모 등 부양하는 가족의 수입니다(본인 포함 최소 1명).
               </p>
             </div>
 
@@ -249,7 +249,7 @@ export default function SalaryNetCalculator() {
                 htmlFor="children"
                 className="min-h-10 text-sm font-medium text-brand-text-secondary"
               >
-                8~20세 자녀 수
+                8세 이상 자녀·손자녀 수
               </label>
               <div className="relative">
                 <select
@@ -274,8 +274,8 @@ export default function SalaryNetCalculator() {
               </div>
               <p className="text-xs text-brand-text-secondary">
                 {childrenDisabled
-                  ? "부양가족을 2명 이상으로 설정하면 자녀 수를 입력할 수 있습니다."
-                  : "자녀세액공제 대상. 부양가족 수보다 적어야 합니다."}
+                  ? "부양가족을 2명 이상으로 설정하면 자녀·손자녀 수를 입력할 수 있습니다."
+                  : "8세 이상 20세 이하인 자녀·손자녀(입양자·위탁아동 포함). 장애인은 20세를 넘어도 포함됩니다."}
               </p>
             </div>
           </div>
