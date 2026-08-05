@@ -16,6 +16,8 @@
 // =============================================================================
 
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
 
 import {
   calculateSalary,
@@ -58,6 +60,13 @@ import {
   formatDsrFormulaLine,
   isRatioExactAt1Decimal,
 } from "../../lib/ratio-display";
+// 최저시급 단일 소스(티켓 #40) — 금지 토큰을 하드코딩하지 않고 여기서 파생시킨다.
+import {
+  MINIMUM_WAGE,
+  MINIMUM_WAGE_TEXT,
+  formatThousands,
+  minimumWageHolidayExample,
+} from "../../lib/minimum-wage";
 
 // -----------------------------------------------------------------------------
 // 미니 테스트 하네스 (프레임워크 없이 per-engine PASS 라인 + 총계)
@@ -1294,7 +1303,14 @@ suite("annual-leave", (t) => {
 // =============================================================================
 // 16) weekly-holiday-allowance — 주휴수당((min(h,40) ÷ 40) × 8 × 시급)
 //     출처: planning/weekly-holiday-allowance-design.md §5 예시(주 20h·10,320원)
-//           + lib/blog.ts 라이브 근무형태 표(주 15/20/25/30/40h, 2026-07-29 QA 검증)
+//           + lib/blog.ts 라이브 근무형태 표(주 15/20/25/30/40h, 2026-07-29 QA 검증
+//             — **2026년 최저시급 기준 시점**의 표다)
+//     ※ 위 "출처"는 **그 시점의 것**이고, 앞으로도 그렇게만 읽어야 한다. 라이브 블로그
+//       표는 이후 minimumWageHolidayExample() 파생으로 바뀌어, 최저시급 상수를 교체하면
+//       새 기준값으로 이동한다. 반면 아래 앵커는 **교체 후에도 그대로 두는 것이 정답**이다
+//       — 앵커는 시급을 리터럴 인자로 넘겨 "고정 입력 → 고정 출력"을 잠그는 장치이지,
+//       라이브 표시값을 따라가는 장치가 아니다. 따라서 교체 후 "라이브 표 ≠ 앵커"는
+//       엔진 결함이 아니라 정상이며, 그걸 근거로 앵커 값을 갱신하면 회귀 잠금이 풀린다.
 //     기대값 취득: 2026-07-30 스크래치에서 lib/weekly-holiday-allowance.ts를 그대로
 //       import 해 실행한 출력을 그대로 옮겼다(수기 계산값 아님).
 //         calculateWeeklyHolidayAllowance({hourlyWage:10_320, weeklyHours:20})
@@ -1306,7 +1322,8 @@ suite("annual-leave", (t) => {
 // =============================================================================
 
 suite("weekly-holiday", (t) => {
-  // 앵커 A(대표 = 디자인 §5 예시·라이브 블로그 표): 시급 10,320원 · 주 20시간
+  // 앵커 A(대표 = 디자인 §5 예시 · **2026년 기준 시점**의 라이브 블로그 표).
+  //   인자·기대값은 최저시급 교체 후에도 갱신하지 않는다 — 위 ※ 참조.
   const a = calculateWeeklyHolidayAllowance({ hourlyWage: 10_320, weeklyHours: 20 });
   assert.ok(a.ok && a.eligible, "WH-A ok/eligible");
   if (a.ok && a.eligible) {
@@ -1817,6 +1834,246 @@ suite("rate→bp 변환 가드", (t) => {
   const halfBp = 0.00925 * 10_000; // 92.5 — 정수 bp로 표현 불가
   t.eq(Math.abs(halfBp - Math.round(halfBp)) < 1e-6, false, "가드 자체 검증: 0.925%는 정수 bp 불가로 감지");
   t.eq(Math.round(halfBp), 93, "가드 자체 검증: Math.round가 92.5를 93으로 올림(요율 왜곡)");
+});
+
+// =============================================================================
+// 최저시급 파생 리터럴 금지 (2026-08-06 티켓 #41)
+//
+// 티켓 #40에서 최저시급 단일 소스(lib/minimum-wage.ts)를 복구했지만, 하드코딩
+// 재발을 막는 장치는 "주석뿐"이었다. 이 스위트가 그 강제 장치다.
+//
+// 규칙: lib/·components/·app/ 의 .ts/.tsx 안에 **현재 최저시급 금액과 그 파생금액**을
+//       숫자 리터럴로 적으면 FAIL. 세 표기 모두 잡는다 —
+//       천단위 쉼표형 / 쉼표 없는 형 / TS 숫자 구분자형(자릿수 사이 밑줄).
+//       ※ 여기에 각 표기의 예시를 실제 금액으로 적지 말 것 — 이 파일도 스캔 대상이
+//         아니라서 그 리터럴은 아무 장치에도 안 걸리고 다음 교체 회차에 그대로 썩는다.
+//       파생금액 = minimumWageHolidayExample(h)의 주휴수당 4종,
+//       h는 **0.5시간 격자로 15 ≤ h ≤ 60** 열거(= 91개 지점).
+//
+// 설계 원칙 3가지:
+//  1) 금지 토큰을 이 파일에 하드코딩하지 않는다. lib/minimum-wage.ts에서 런타임에
+//     파생시킨다 — 상수를 교체하면 금지 목록도 같이 이동해야 테스트가 안 썩는다.
+//  2) 경로는 cwd가 아니라 __dirname 기준(tsx는 CJS로 트랜스폼 → __dirname 유효).
+//  3) **공허한 PASS 방지**: 스캐너가 파일을 못 읽거나 토큰이 비면 "적중 0건"이 나와
+//     아무것도 검사하지 않고 통과한다. 그래서 (a) 매처 자기시험(양성/음성 대조군),
+//     (b) 스캔 대상 존재 확인, (c) 토큰 개수 > 0 을 같은 스위트에서 단언한다.
+//
+// R2 변경(2026-08-06, QA FAIL 1 + 마스터 실측 1):
+//  · h 열거를 정수 → 0.5시간 격자로 확대. 정수만 돌면 주 37.5시간(실재하는 근로형태)의
+//    파생금액이 금지 목록에서 빠져 **조용히 통과**했다(QA 재현: lib/blog.ts에 심은
+//    "주 37.5시간 주휴수당 …원, 월 …원"이 PASS). 확대 후 현재 소스 전체 재측정 =
+//    **토큰 470개 / 74개 파일 / 적중 0건**(2026-08-06 실측) → 오탐 0이라 그대로 채택.
+//  · TS 숫자 구분자 표기 미탐 보완. 매칭 직전 줄을 정규화한다(아래 normalize 참조).
+//
+// R3 변경(2026-08-06, QA NOTE 채택):
+//  · **격자 폭이 자기보장되지 않았다.** 격자를 정수로 되돌려도 전 스위트가 통과해(QA
+//    사보타주 S5), 미래에 누가 격자를 좁히면 R2에서 고친 결함이 조용히 재발한다.
+//    → 양성 대조군 5(반정수 지점)를 추가해, 격자를 정수로 되돌리면 즉시 FAIL하게 했다.
+//
+// 이 규칙이 **못 잡는 것**은 lib/minimum-wage.ts 헤더 (c)에 적어 두었다.
+// =============================================================================
+
+suite("최저시급 리터럴 금지", (t) => {
+  // ── (1) 금지 토큰 파생 (하드코딩 금지) ──────────────────────────────────────
+  /** 토큰 → 유래 라벨. 같은 숫자가 여러 유래를 가지면 첫 유래를 남긴다. */
+  const origin = new Map<string, string>();
+  const addToken = (formatted: string, from: string): void => {
+    for (const tok of [formatted, formatted.replace(/,/g, "")]) {
+      if (!origin.has(tok)) origin.set(tok, from);
+    }
+  };
+
+  addToken(MINIMUM_WAGE_TEXT, "MINIMUM_WAGE");
+  // 0.5시간 격자(half를 정수로 돌려 부동소수 누적을 피한다). 정수만 열거하면
+  // 주 37.5시간·17.5시간처럼 실재하는 소정근로시간의 파생금액이 통째로 빠진다.
+  for (let half = 15 * 2; half <= 60 * 2; half++) {
+    const h = half / 2;
+    const ex = minimumWageHolidayExample(h);
+    addToken(ex.weeklyAllowance, `h=${h} weeklyAllowance`);
+    addToken(ex.monthlyAllowance, `h=${h} monthlyAllowance`);
+    addToken(ex.effectiveHourlyWage, `h=${h} effectiveHourlyWage`);
+    addToken(ex.monthlyWageWithHoliday, `h=${h} monthlyWageWithHoliday`);
+  }
+  // 주의: holidayConvertedHours("4.0" 등)는 토큰에 넣지 않는다 — 최저시급과 무관한
+  //       소수 표기까지 전부 오탐으로 잡는다.
+
+  // (c) 토큰이 비면 스캔은 항상 0건 = 공허한 PASS. 개수를 먼저 잠근다.
+  const tokens = [...origin.keys()].sort((a, b) => b.length - a.length);
+  t.ok(tokens.length > 0, "(c) 금지 토큰 집합이 비어 있지 않다");
+  t.ok(
+    origin.has(MINIMUM_WAGE_TEXT) && origin.has(String(MINIMUM_WAGE)),
+    "(c) 최저시급 본값이 쉼표형·무쉼표형 모두 토큰에 포함된다"
+  );
+
+  // ── (2) 표기 정규화 + 매처 (숫자 경계 유지) ────────────────────────────────
+  // TS 숫자 구분자(자릿수 사이 밑줄)는 이 저장소의 관용 표기다 — lib/minimum-wage.ts
+  // 자신이 MINIMUM_WAGE를 그 표기로 선언하고, lib/·components/·app/에 같은 표기의 수치
+  // 리터럴이 105개 있다(2026-08-06 실측, 밑줄 문자 기준으로는 156개). 즉 상수가
+  // 재하드코딩된다면 가장 유력한 형태가 하필 이것이다.
+  // 토큰을 3배로 늘리는 대신 **매칭 직전에 줄을 정규화**해서 잡는다.
+  //   · 지우는 것은 "숫자와 숫자 사이의 _" 뿐이다. 식별자 속 밑줄(WAGE_<숫자>)이나
+  //     무관한 더 큰 수(앞자리가 붙은 구분자 표기)의 경계는 그대로 남아 오탐이 늘지
+  //     않는다 (아래 음성 대조군 3·4가 그 자리에서 증명한다).
+  //   · 정규화는 **탐지 전용**이다. 줄 번호는 원문 인덱스를 그대로 쓰고, FAIL
+  //     메시지에는 원문 줄을 함께 실어 소스에서 찾을 수 있게 한다(아래 (4)).
+  const normalize = (line: string): string => line.replace(/(?<=\d)_(?=\d)/g, "");
+
+  const escapeRe = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  // 앞뒤가 숫자/쉼표/마침표면 더 큰 수의 일부이므로 적중시키지 않는다.
+  const pattern = `(?<![\\d,.])(?:${tokens.map(escapeRe).join("|")})(?![\\d,.])`;
+  const matchAll = (line: string): string[] =>
+    normalize(line).match(new RegExp(pattern, "g")) ?? [];
+
+  /** 숫자 문자열을 TS 숫자 구분자 표기로 (뒤에서 3자리마다 밑줄) */
+  const groupUnderscore = (digits: string): string =>
+    digits.replace(/\B(?=(\d{3})+(?!\d))/g, "_");
+
+  // ── (3a) 매처 자기시험: 양성 대조군은 반드시 적중해야 한다 ──────────────────
+  const positive = `const x = "${MINIMUM_WAGE_TEXT}원";`;
+  t.eq(matchAll(positive), [MINIMUM_WAGE_TEXT], "(a) 양성 대조군: 최저시급 리터럴을 적중");
+  const derived = minimumWageHolidayExample(20);
+  t.eq(
+    matchAll(`실질시급 ${derived.effectiveHourlyWage}원`),
+    [derived.effectiveHourlyWage],
+    "(a) 양성 대조군: 파생금액(h=20 실질시급) 리터럴을 적중"
+  );
+  t.eq(
+    matchAll(derived.effectiveHourlyWage.replace(/,/g, "")),
+    [derived.effectiveHourlyWage.replace(/,/g, "")],
+    "(a) 양성 대조군: 무쉼표 표기도 적중"
+  );
+  // 양성 대조군 3·4 — TS 숫자 구분자 표기(정규화 경로). 적중값은 무쉼표 토큰이 된다.
+  const wagePlain = String(MINIMUM_WAGE);
+  t.eq(
+    matchAll(`const X = ${groupUnderscore(wagePlain)};`),
+    [wagePlain],
+    "(a) 양성 대조군: 최저시급의 숫자 구분자 표기를 적중"
+  );
+  const derivedPlain = derived.monthlyWageWithHoliday.replace(/,/g, "");
+  t.eq(
+    matchAll(`const Y = ${groupUnderscore(derivedPlain)};`),
+    [derivedPlain],
+    "(a) 양성 대조군: 파생금액의 숫자 구분자 표기를 적중(h=20 주휴 포함 월급여)"
+  );
+  // 정규화가 실제로 표기를 바꾸는지(대조군이 공허하지 않은지) 그 자리에서 확인
+  t.ok(
+    groupUnderscore(wagePlain) !== wagePlain && normalize(groupUnderscore(wagePlain)) === wagePlain,
+    "(a) 대조군 비공허: 구분자 표기가 실제로 존재하고 정규화로 복원된다"
+  );
+  // 양성 대조군 5 — **격자 폭 자기보장**(R3). 위 대조군들은 격자를 정수로 되돌려도 전부
+  //   통과한다(QA 사보타주 S5 실증) — 즉 R2에서 고친 축만 "공허한 PASS 방지"(설계 원칙 3)의
+  //   보호를 못 받고 있었다. 반정수 지점의 파생금액이 금지 목록에 드는지를 여기서 잠근다.
+  //   ※ 토큰 개수나 격자 지점 수를 하드코딩해 잠그지 않는다(상수·격자를 정당하게 바꿀 때
+  //     썩는다). 잠그는 것은 **"반정수 h의 파생금액이 토큰 집합에 있는가"라는 성질**뿐이다.
+  const halfPoint = 37.5; // 실재하는 소정근로시간(주 5일 × 7.5시간)
+  t.eq(Number.isInteger(halfPoint), false, "(a) 격자 폭 대조군이 실제로 반정수 지점이다");
+  const halfEx = minimumWageHolidayExample(halfPoint);
+  const halfNeighbors = [
+    minimumWageHolidayExample(Math.floor(halfPoint)),
+    minimumWageHolidayExample(Math.ceil(halfPoint)),
+  ];
+  //   h에 따라 값이 변하는 항목만 쓴다. 실질시급은 h ≤ 40에서 h와 무관한 상수라 정수
+  //   격자에서도 우연히 적중해 대조군이 공허해진다(= 격자 폭을 못 잠근다).
+  for (const key of ["weeklyAllowance", "monthlyAllowance", "monthlyWageWithHoliday"] as const) {
+    const value = halfEx[key];
+    t.ok(
+      halfNeighbors.every((n) => n[key] !== value),
+      `(a) 격자 폭 대조군 비공허: h=${halfPoint} ${key}가 이웃 정수 h와 값이 다르다`
+    );
+    t.ok(origin.has(value), `(a) 격자 폭: h=${halfPoint} ${key}가 금지 토큰에 포함(정수 격자로 되돌리면 FAIL)`);
+    t.eq(matchAll(`${value}원`), [value], `(a) 격자 폭: h=${halfPoint} ${key} 리터럴을 매처가 적중`);
+  }
+  // 음성 대조군 1 — 최저시급과 무관한 금액(토큰이 아님을 런타임에 확인하고 쓴다)
+  let controlAmount = 1_000_000;
+  while (origin.has(formatThousands(controlAmount))) controlAmount += 1;
+  t.eq(
+    matchAll(`월 ${formatThousands(controlAmount)}원`),
+    [],
+    "(a) 음성 대조군: 무관한 금액은 적중하지 않는다"
+  );
+  // 음성 대조군 2 — 숫자 경계: 더 큰 수의 일부는 적중하지 않는다
+  t.eq(matchAll(`9${MINIMUM_WAGE_TEXT}`), [], "(a) 음성 대조군: 앞자리가 붙은 큰 수는 미적중");
+  t.eq(matchAll(`${MINIMUM_WAGE_TEXT}0`), [], "(a) 음성 대조군: 뒷자리가 붙은 큰 수는 미적중");
+  // 음성 대조군 3 — 구분자 표기의 **더 큰 수**는 정규화 후에도 미적중이어야 한다
+  //   (정규화가 큰 수를 잘게 쪼개 오탐을 만들지 않는다는 증명)
+  t.eq(
+    matchAll(`const Z = ${groupUnderscore("10" + wagePlain)};`),
+    [],
+    "(a) 음성 대조군: 앞자리가 붙은 큰 수의 구분자 표기는 미적중"
+  );
+  // 음성 대조군 4 — 식별자 속 밑줄은 지우지 않는다(정규화 범위가 숫자↔숫자로 한정)
+  t.eq(
+    normalize(`const WAGE_${wagePlain}_LABEL = 1;`),
+    `const WAGE_${wagePlain}_LABEL = 1;`,
+    "(a) 음성 대조군: 식별자의 밑줄은 정규화 대상이 아니다"
+  );
+
+  // ── (3b) 스캔 대상 수집 + 존재 확인 ────────────────────────────────────────
+  const projectRoot = path.resolve(__dirname, "../..");
+  const scanRoots = ["lib", "components", "app"];
+  /** 단일 소스 자신은 제외 (여기에는 값이 있어야 한다) */
+  const selfPath = path.resolve(projectRoot, "lib/minimum-wage.ts");
+  const rel = (abs: string): string => path.relative(projectRoot, abs).split(path.sep).join("/");
+
+  const collect = (dir: string): string[] => {
+    const out: string[] = [];
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) out.push(...collect(full));
+      else if (/\.tsx?$/.test(entry.name) && path.resolve(full) !== selfPath) out.push(full);
+    }
+    return out;
+  };
+
+  const files: string[] = [];
+  for (const root of scanRoots) {
+    const abs = path.resolve(projectRoot, root);
+    t.ok(fs.existsSync(abs), `(b) 스캔 루트 존재: ${root}/`);
+    const found = collect(abs);
+    t.ok(found.length > 0, `(b) 스캔 루트가 비어 있지 않다: ${root}/ (${found.length}개)`);
+    files.push(...found);
+  }
+  const relFiles = files.map(rel);
+  t.ok(relFiles.length > 0, `(b) 스캔 파일 수 > 0 (${relFiles.length}개)`);
+  // walk가 조용히 깨져도 알아채도록, 리터럴이 실제로 있었던 두 파일을 이름으로 확인.
+  t.ok(relFiles.includes("lib/blog.ts"), "(b) 스캔 목록에 lib/blog.ts 포함");
+  t.ok(relFiles.includes("lib/calculators.ts"), "(b) 스캔 목록에 lib/calculators.ts 포함");
+  t.ok(!relFiles.includes("lib/minimum-wage.ts"), "(b) 단일 소스 자신은 스캔에서 제외");
+
+  // ── (4) 실제 스캔 ─────────────────────────────────────────────────────────
+  //   FAIL 메시지에는 적중 토큰과 **원문 줄**을 함께 싣는다. 정규화 경로로 잡힌 경우
+  //   토큰(쉼표 없는 숫자열)이 소스에 그 형태로 존재하지 않아(소스에는 밑줄이 끼어 있다)
+  //   토큰만 찍으면 사용자가 검색으로 못 찾는다. 그래서 원문 줄과 정규화 여부를 명시한다.
+  const hits: string[] = [];
+  for (const file of files) {
+    const lines = fs.readFileSync(file, "utf8").split(/\r?\n/);
+    lines.forEach((line, i) => {
+      const found = matchAll(line);
+      if (found.length === 0) return;
+      const viaNormalize = normalize(line) !== line;
+      const snippet = line.trim().slice(0, 120);
+      for (const tok of found) {
+        hits.push(
+          `${rel(file)}:${i + 1}  "${tok}"  (유래: ${origin.get(tok)})` +
+            (viaNormalize ? "  [숫자 구분자 제거 후 매칭 — 소스 표기는 다름]" : "") +
+            `\n      원문: ${snippet}`
+        );
+      }
+    });
+  }
+
+  const shown = hits.slice(0, 20);
+  const overflow = hits.length > 20 ? `\n  … 외 ${hits.length - 20}건` : "";
+  t.eq(
+    hits.length,
+    0,
+    `최저시급 파생 리터럴이 소스에 하드코딩됨 (${hits.length}건)\n  ` +
+      shown.join("\n  ") +
+      overflow +
+      "\n  → 이 값들은 리터럴로 적지 말고 lib/minimum-wage.ts의 헬퍼로 만들 것:" +
+      "\n     금액 표기 = MINIMUM_WAGE_TEXT / MINIMUM_WAGE_LABEL," +
+      "\n     주휴수당 파생금액 = minimumWageHolidayExample(주간 소정근로시간)."
+  );
 });
 
 // -----------------------------------------------------------------------------
