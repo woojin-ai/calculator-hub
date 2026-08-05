@@ -596,7 +596,7 @@ export const blogPosts: BlogPost[] = [
   },
   {
     slug: "weekly-holiday-allowance-guide-2026",
-    title: "주휴수당이란? 알바도 받는 조건·계산법 총정리 (2026년)",
+    title: `주휴수당이란? 알바도 받는 조건·계산법 총정리 (${MINIMUM_WAGE_YEAR}년)`,
     description:
       `주휴수당의 뜻과 지급조건 3가지, 계산 공식, ${MINIMUM_WAGE_LABEL} 기준 실제 예시까지 한눈에 정리했습니다. 알바·단시간 근로자도 조건만 맞으면 받을 수 있어요. 주휴수당 계산기로 내 금액도 바로 확인해 보세요.`,
     category: "salary",
@@ -2059,7 +2059,7 @@ export const blogPosts: BlogPost[] = [
   },
   {
     slug: "weekly-holiday-allowance-eligibility-2026",
-    title: "주휴수당 조건 총정리 — 주 15시간·단시간 알바·40시간 초과 실전 케이스 (2026년)",
+    title: `주휴수당 조건 총정리 — 주 15시간·단시간 알바·40시간 초과 실전 케이스 (${MINIMUM_WAGE_YEAR}년)`,
     description:
       `주휴수당은 언제 발생하고 언제 못 받을까요? 주 15시간 경계, 단시간 알바 근무형태별 금액, 주 40시간 초과 상한, 못 받는 경우까지 ${MINIMUM_WAGE_LABEL} 기준으로 조건 중심으로만 정리했습니다. 계산 공식은 1편과 주휴수당 계산기에서 확인하세요.`,
     category: "salary",
