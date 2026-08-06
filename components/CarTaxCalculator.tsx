@@ -6,7 +6,7 @@ import {
   formatCcBracketLabel,
   CC_TAX_BRACKETS,
   EDUCATION_TAX_RATE,
-  PREPAY_DISCOUNT_RATE,
+  PREPAY_EFFECTIVE_RATE,
   AGE_RELIEF_START_YEAR,
   AGE_RELIEF_PER_YEAR,
   AGE_RELIEF_MAX,
@@ -34,7 +34,9 @@ const KIND_LABEL: Record<CarKind, string> = {
 
 // 세율/할인율 문자열은 상수에서 조합(하드코딩 금지, §0).
 const EDUCATION_TAX_PERCENT = `${Math.round(EDUCATION_TAX_RATE * 100)}%`;
-const PREPAY_DISCOUNT_PERCENT = `${Math.round(PREPAY_DISCOUNT_RATE * 100)}%`;
+// 연납 할인은 「미경과 일수 ÷ 365 × 연 5% 이자율」이라 실질 할인율이 정수 %가 아니다.
+// Math.round는 5%로 반올림돼 화면 출력(4.58%)과 자기모순이 되므로 소수 자리를 살린다.
+const PREPAY_DISCOUNT_PERCENT = `약 ${(PREPAY_EFFECTIVE_RATE * 100).toFixed(2)}%`;
 // 배기량 힌트 구간표 안내 (상수에서 조합)
 const CC_BRACKET_HINT = `${CC_TAX_BRACKETS[0].maxCc.toLocaleString("ko-KR")}cc 이하 ${CC_TAX_BRACKETS[0].wonPerCc}원, ${CC_TAX_BRACKETS[1].maxCc.toLocaleString("ko-KR")}cc 이하 ${CC_TAX_BRACKETS[1].wonPerCc}원, ${CC_TAX_BRACKETS[1].maxCc.toLocaleString("ko-KR")}cc 초과 ${CC_TAX_BRACKETS[2].wonPerCc}원/cc`;
 // 차령 경감 안내 (상수에서 조합)

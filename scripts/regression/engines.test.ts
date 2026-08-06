@@ -41,7 +41,12 @@ import { calculateSeverance } from "../../lib/severance";
 import { calculateElectricity } from "../../lib/electricity";
 import { convert } from "../../lib/units";
 import { calculateSavingsInterest } from "../../lib/savings-interest";
-import { calculateCarTax } from "../../lib/car-tax";
+import {
+  calculateCarTax,
+  PREPAY_INTEREST_RATE,
+  PREPAY_JAN_DAYS,
+  PREPAY_YEAR_DAYS,
+} from "../../lib/car-tax";
 import {
   calculateAnnualLeaveAllowance,
   computeAccruedLeaveDays,
@@ -1148,8 +1153,8 @@ suite("car-tax", (t) => {
     t.eq(a.amounts.educationTax, 96_000, "A 지방교육세(30%)");
     t.eq(a.amounts.annualTotal, 416_000, "A 연세액 총액(Tier①)");
     t.eq(a.amounts.semiAnnual, 208_000, "A 정기분 각 회차");
-    t.eq(a.amounts.prepayDiscount, 9_600, "A 연납 할인액(본세 3%)");
-    t.eq(a.amounts.prepayTotal, 406_400, "A 연납 납부액");
+    t.eq(a.amounts.prepayDiscount, 14_641, "A 연납 할인액(본세×334/365×5%)");
+    t.eq(a.amounts.prepayTotal, 401_359, "A 연납 납부액");
   }
 
   // 케이스 B: 전기·수소차 · 2023등록 (정액 10만, 경감 없음)
@@ -1161,8 +1166,8 @@ suite("car-tax", (t) => {
     t.eq(b.amounts.educationTax, 30_000, "B 교육세 3만");
     t.eq(b.amounts.annualTotal, 130_000, "B 연세액 총액");
     t.eq(b.amounts.semiAnnual, 65_000, "B 정기분 각 65,000");
-    t.eq(b.amounts.prepayDiscount, 3_000, "B 연납 할인 3,000");
-    t.eq(b.amounts.prepayTotal, 127_000, "B 연납 납부액");
+    t.eq(b.amounts.prepayDiscount, 4_575, "B 연납 할인 4,575(본세×334/365×5%)");
+    t.eq(b.amounts.prepayTotal, 125_425, "B 연납 납부액");
   }
 
   // 케이스 C: 1,600cc · 2010등록 · 내연 (경감 상한 50%, 1,600cc는 140원/cc 구간)
@@ -1174,6 +1179,57 @@ suite("car-tax", (t) => {
     t.eq(c.amounts.baseTax, 112_000, "C 본세(경감 후)");
     t.eq(c.amounts.annualTotal, 145_600, "C 연세액 총액");
   }
+
+  // 케이스 D: 998cc · 2015등록 · 내연 (경감 45%, baseTax가 홀수라 반올림 경로를 함께 잠금)
+  const d = calculateCarTax({ kind: "combustion", cc: 998, registerYear: 2015 });
+  assert.ok(d.ok, "CAR-D ok");
+  if (d.ok) {
+    t.eq(d.amounts.baseTaxRaw, 79_840, "D 본세(경감 전) 998×80");
+    t.eq(d.amounts.reliefRate, 0.45, "D 경감률 45%(차령 11년)");
+    t.eq(d.amounts.baseTax, 43_912, "D 본세(경감 후)");
+  }
+
+  // ---------------------------------------------------------------------------
+  // ★ 연납 할인 "성질 검사" (티켓 #30·#52 재발 방지)
+  //   하드코딩 앵커만 갱신하면 회귀 테스트가 탐지기가 아니라 **인증기**로 작동해
+  //   상수 오류를 그대로 고정한다(3% 오류가 그렇게 8개월 살아남았다). 그래서 앵커와
+  //   별개로, 할인액이 「미경과 일수 ÷ 365 × 이자율」이라는 **법정 산식의 성질**을
+  //   만족하는지 4케이스 전부에서 검사한다.
+  //   - 기대비율은 lib/car-tax.ts 상수에서 런타임 파생한다(테스트에 0.05·334 리터럴
+  //     을 쓰면 그 순간 또 인증기가 된다).
+  //   - 근거: 지방세법 제128조제3항 제1호 + 같은 법 시행령 제125조제6항.
+  // ---------------------------------------------------------------------------
+  const expectedPrepayRatio =
+    (PREPAY_JAN_DAYS * PREPAY_INTEREST_RATE) / PREPAY_YEAR_DAYS;
+
+  for (const [name, outcome] of [
+    ["A", a],
+    ["B", b],
+    ["C", c],
+    ["D", d],
+  ] as const) {
+    if (!outcome.ok) continue;
+    const { baseTax, prepayDiscount } = outcome.amounts;
+    // 할인액 = round(본세 × 기대비율) — 반올림 오차 1원 내
+    t.approx(
+      prepayDiscount,
+      baseTax * expectedPrepayRatio,
+      1,
+      `${name} 연납 할인액이 법정 산식(미경과일수/365×이자율)과 1원 내 일치`,
+    );
+    // 비율 자체도 확인(정액률 회귀 시 즉시 FAIL)
+    t.approx(
+      prepayDiscount / baseTax,
+      expectedPrepayRatio,
+      1 / baseTax,
+      `${name} 할인율 = 미경과일수/365×이자율`,
+    );
+  }
+
+  // ⚠️ 이 4.58%는 의도적 외부 리터럴이다. 서초구 공시 2026년 표(1월 연납 실질 공제율).
+  // 상수에서 파생시키지 마라 — 파생시키는 순간 인증기가 되어 상수 오염을 못 잡는다.
+  // (실증: PREPAY_INTEREST_RATE를 0.0328로 오염시키면 성질 검사는 PASS, 이 줄만 FAIL)
+  t.approx(expectedPrepayRatio, 0.0458, 0.0001, "1월 연납 실질 할인율 ≈ 4.58%(지자체 공시표 대조)");
 
   // 경계값: 1,600cc → 140원/cc, 1,601cc → 200원/cc (cc<=maxCc 순차 매칭)
   const edge1600 = calculateCarTax({ kind: "combustion", cc: 1600, registerYear: 2026 });

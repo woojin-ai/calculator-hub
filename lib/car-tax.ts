@@ -3,7 +3,7 @@
 //
 // 2026년 비영업용 승용차 기준. 화면(자동차세 계산기)의
 //   ① 배기량 힌트의 구간표 안내 ② 결과 Tier② "차령 경감률" 병기
-//   ③ 결과 Tier③ "연납 할인(3%)" 라벨 ④ 하단 출처 병기
+//   ③ 결과 Tier③ "연납 할인(약 4.58%)" 라벨 ④ 하단 출처 병기
 // 가 전부 이 파일의 상수 1곳만 참조하도록 하고, 세율/할인율 숫자 하드코딩을
 // 금지한다. 매년 1월 개정 확인 후 이 파일만 갱신하면 전 화면이 갱신된다.
 //
@@ -30,7 +30,22 @@ export const CC_TAX_BRACKETS = [
 
 export const EDUCATION_TAX_RATE = 0.3; // 지방교육세 = 본세(경감후) × 30%
 export const ECO_CAR_BASE_TAX = 100_000; // 전기·수소차 본세 정액(비영업 승용)
-export const PREPAY_DISCOUNT_RATE = 0.03; // 1월 연납 할인율(2026)
+/** 지방세법 시행령 제125조제6항 — 법 제128조제3항 계산식의 「대통령령으로 정하는 이자율」. */
+export const PREPAY_INTEREST_RATE = 0.05;
+/** 지방세법 제128조제3항 제1호(1월 16~31일) — 납부기한 1/31의 다음 날부터 12/31까지 = 334일(2026, 평년). */
+export const PREPAY_JAN_DAYS = 334;
+/** 같은 호 계산식의 분모. 윤년은 366. */
+export const PREPAY_YEAR_DAYS = 365;
+/**
+ * 1월 연납의 실질 할인율(본세 대비). 이자율 5%와 혼동 금지 — 단위가 다르다.
+ * 334/365 × 5% ≈ 4.58%.
+ *
+ * 같은 호 단서의 한도(「과세기간 경과분을 차감한 연세액의 100분의 10의 범위」)는
+ * 1월 연납의 실질 할인율이 약 4.58%로 10%에 크게 못 미쳐 **도달 불가**하므로
+ * 한도 분기를 구현하지 않는다(죽은 코드 방지).
+ */
+export const PREPAY_EFFECTIVE_RATE =
+  (PREPAY_JAN_DAYS * PREPAY_INTEREST_RATE) / PREPAY_YEAR_DAYS;
 export const AGE_RELIEF_START_YEAR = 3; // 등록 3년차부터 경감
 export const AGE_RELIEF_PER_YEAR = 0.05; // 매년 5%씩
 export const AGE_RELIEF_MAX = 0.5; // 최대 50%
@@ -66,7 +81,7 @@ export interface CarTaxAmounts {
   annualTotal: number;
   /** 정기분 회차액 = round(annualTotal / 2) (6월·12월 각) */
   semiAnnual: number;
-  /** 연납 할인액 = round(baseTax × 3%) (본세 경감후에만 적용) */
+  /** 연납 할인액 = round(baseTax × 334/365 × 5%) (본세 경감후에만 적용, 실질 약 4.58%) */
   prepayDiscount: number;
   /** 연납 납부액 = annualTotal − prepayDiscount */
   prepayTotal: number;
@@ -129,7 +144,9 @@ export function calculateCarTax(input: CarTaxInput): CarTaxOutcome {
   const educationTax = Math.round(baseTax * EDUCATION_TAX_RATE);
   const annualTotal = baseTax + educationTax;
   const semiAnnual = Math.round(annualTotal / 2);
-  const prepayDiscount = Math.round(baseTax * PREPAY_DISCOUNT_RATE);
+  const prepayDiscount = Math.round(
+    (baseTax * PREPAY_JAN_DAYS * PREPAY_INTEREST_RATE) / PREPAY_YEAR_DAYS,
+  );
   const prepayTotal = annualTotal - prepayDiscount;
 
   const amounts: CarTaxAmounts = {
