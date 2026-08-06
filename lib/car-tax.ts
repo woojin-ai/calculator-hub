@@ -46,6 +46,17 @@ export const PREPAY_YEAR_DAYS = 365;
  */
 export const PREPAY_EFFECTIVE_RATE =
   (PREPAY_JAN_DAYS * PREPAY_INTEREST_RATE) / PREPAY_YEAR_DAYS;
+/**
+ * 화면에 실제 인쇄되는 연납 공제율 라벨(티켓 #55). 「약 4.58%」.
+ *
+ * 🔴 컴포넌트에 두지 말고 여기(순수 모듈)에 둔다 — 티켓 #22에서 확립된 정본 패턴이다.
+ * 컴포넌트 안에 있으면 회귀 테스트가 이 정의를 잠글 수 없어(클라이언트 컴포넌트 import 금지),
+ * 상수는 정상인데 라벨만 하드코딩으로 오염되는 축이 열린 채로 남는다(QA 사보타주 S3 실증).
+ * ⚠️ 여기 둔다고 화면 출력 전체가 잠기는 것은 아니다 — 컴포넌트가 이 import를 버리고
+ * 문자열을 인라인하면 회귀는 통과한다(티켓 #59에서 소스 스캔으로 닫을 예정).
+ * 반올림: Math.round는 5%로 뭉개져 실제 공제액과 자기모순이 되므로 소수 2자리를 살린다.
+ */
+export const PREPAY_DISCOUNT_PERCENT = `약 ${(PREPAY_EFFECTIVE_RATE * 100).toFixed(2)}%`;
 export const AGE_RELIEF_START_YEAR = 3; // 등록 3년차부터 경감
 export const AGE_RELIEF_PER_YEAR = 0.05; // 매년 5%씩
 export const AGE_RELIEF_MAX = 0.5; // 최대 50%

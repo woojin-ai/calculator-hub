@@ -43,6 +43,8 @@ import { convert } from "../../lib/units";
 import { calculateSavingsInterest } from "../../lib/savings-interest";
 import {
   calculateCarTax,
+  PREPAY_DISCOUNT_PERCENT,
+  PREPAY_EFFECTIVE_RATE,
   PREPAY_INTEREST_RATE,
   PREPAY_JAN_DAYS,
   PREPAY_YEAR_DAYS,
@@ -1227,9 +1229,51 @@ suite("car-tax", (t) => {
   }
 
   // ⚠️ 이 4.58%는 의도적 외부 리터럴이다. 서초구 공시 2026년 표(1월 연납 실질 공제율).
-  // 상수에서 파생시키지 마라 — 파생시키는 순간 인증기가 되어 상수 오염을 못 잡는다.
-  // (실증: PREPAY_INTEREST_RATE를 0.0328로 오염시키면 성질 검사는 PASS, 이 줄만 FAIL)
+  // 🔴 제거 금지 · 상수 파생 금지 — 파생시키는 순간 인증기가 되어 상수 오염을 못 잡는다.
+  // (실증 정정, 티켓 #58: PREPAY_INTEREST_RATE만 0.0328로 오염시키면 **하드코딩 앵커**
+  //  (A 연납 할인 14,641 등)가 먼저 FAIL난다. 「성질 검사는 전부 PASS인데 이 줄만 FAIL」이
+  //  성립하는 것은 오염과 함께 앵커까지 재생성된 2단 사보타주에서다 — QA 실증. 즉 이 줄은
+  //  앵커가 이미 오염값으로 갈아엎힌 뒤에도 남는 **마지막 외부 기준점**이다.)
   t.approx(expectedPrepayRatio, 0.0458, 0.0001, "1월 연납 실질 할인율 ≈ 4.58%(지자체 공시표 대조)");
+
+  // ---------------------------------------------------------------------------
+  // ★ UI 상수 ↔ 엔진 산식 이탈 탐지 (티켓 #55)
+  //   위 성질 검사는 PREPAY_JAN_DAYS·PREPAY_INTEREST_RATE·PREPAY_YEAR_DAYS로 같은 식을
+  //   **독립 재계산**할 뿐이라, 화면 라벨에 실제 인쇄되는 PREPAY_EFFECTIVE_RATE 자체가
+  //   리터럴(예: 0.03)로 오염돼도 전 케이스가 PASS로 남는다. 그러면 할인액은 4.58%인데
+  //   라벨만 "약 3.00%"가 되어 **보는 숫자와 받는 숫자가 달라진다**. 그 사각지대를 막는다.
+  //   - 근거: 라벨 문자열은 lib/car-tax.ts의 PREPAY_DISCOUNT_PERCENT 한 곳에서 만들어지고,
+  //     components/CarTaxCalculator.tsx가 그것을 import해 2지점(Tier③ 라벨·하단 안내)에서
+  //     소비한다. 그래서 lib 쪽 정의를 잠그면 두 지점이 함께 잠긴다.
+  // ---------------------------------------------------------------------------
+  // (1) 라벨용 상수가 법정 산식에서 이탈했는지 — 부동소수 재결합 오차(1e-12)만 허용한다.
+  t.approx(
+    PREPAY_EFFECTIVE_RATE,
+    expectedPrepayRatio,
+    1e-12,
+    "PREPAY_EFFECTIVE_RATE(화면 라벨용) = 미경과일수/365×이자율 (리터럴 오염 탐지)",
+  );
+
+  // (2) 라벨 문자열의 **정의 지점(lib/car-tax.ts)** 을 잠근다. 🔴 변환식을 여기 **복제하지
+  //     않고** PREPAY_DISCOUNT_PERCENT를 그대로 import한다 — 복제하면 라벨 쪽만 하드코딩
+  //     으로 오염돼도 전 케이스가 PASS로 남는다(QA 사보타주 S3가 실증).
+  //     컴포넌트를 직접 import하지 않는 것이 정본이므로(티켓 #22) 라벨을 순수 모듈로 올렸다.
+  // ⚠️ **사정거리 한정(QA R2 실측 — 넓게 읽지 말 것)**: 이 검사가 닫는 것은 「lib의 라벨
+  //     정의 오염」 축뿐이다. 컴포넌트가 import를 버리고 지역 상수를 재도입하거나, 렌더
+  //     지점에 문자열을 인라인하거나, import한 값을 .replace()로 가공하면 **여기는 전부
+  //     PASS한다**(QA 사보타주 B·C·E). 그 축은 소스 스캔 어서션이 필요하다 → 티켓 #59.
+  //     같은 이유로 lib/calculators.ts·lib/blog.ts의 평문 "약 4.58%"도 여기서 안 잡힌다.
+  // 🔴 이 "4.58"·"약 4.58%"도 (1)과 달리 의도적 외부 리터럴이다. 제거 금지 · 상수 파생 금지.
+  t.eq(
+    (PREPAY_EFFECTIVE_RATE * 100).toFixed(2),
+    "4.58",
+    "라벨 소수 2자리 문자열 = \"4.58\"",
+  );
+  t.eq(
+    PREPAY_DISCOUNT_PERCENT,
+    "약 4.58%",
+    "연납 공제 라벨의 정의 지점(lib/car-tax.ts PREPAY_DISCOUNT_PERCENT) = \"약 4.58%\"",
+  );
 
   // 경계값: 1,600cc → 140원/cc, 1,601cc → 200원/cc (cc<=maxCc 순차 매칭)
   const edge1600 = calculateCarTax({ kind: "combustion", cc: 1600, registerYear: 2026 });
