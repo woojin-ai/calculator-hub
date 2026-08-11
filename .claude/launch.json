@@ -4,9 +4,63 @@
     {
       "name": "calculator-hub-dev",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
       "port": 3000,
       "autoPort": true
+    },
+    {
+      "name": "loan-compare-prod",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "C:\\bitcoin_vdcode\\loan-compare_claude code\\node_modules\\next\\dist\\bin\\next",
+        "start",
+        "C:\\bitcoin_vdcode\\loan-compare_claude code",
+        "-p",
+        "3105"
+      ],
+      "port": 3105,
+      "autoPort": false
+    },
+    {
+      "name": "realestate-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "C:\\bitcoin_vdcode\\realestate_claude code",
+        "run",
+        "dev"
+      ],
+      "port": 3200,
+      "autoPort": true
+    },
+    {
+      "name": "bokgwon-lab-dev",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "C:/GPT/bokgwon-lab/node_modules/next/dist/bin/next",
+        "dev",
+        "C:/GPT/bokgwon-lab",
+        "-p",
+        "3333"
+      ],
+      "port": 3333,
+      "autoPort": false
+    },
+    {
+      "name": "ar-ledger-dev",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "C:/bitcoin_vdcode/ar-ledger_claude code/node_modules/next/dist/bin/next",
+        "dev",
+        "C:/bitcoin_vdcode/ar-ledger_claude code",
+        "-p",
+        "3021"
+      ],
+      "port": 3021,
+      "autoPort": false
     }
   ]
 }
