@@ -34,9 +34,12 @@ const KIND_LABEL: Record<CarKind, string> = {
 
 // 세율/할인율 문자열은 상수에서 조합(하드코딩 금지, §0).
 const EDUCATION_TAX_PERCENT = `${Math.round(EDUCATION_TAX_RATE * 100)}%`;
-// 연납 공제율 라벨(「약 4.58%」)은 lib/car-tax.ts에서 import한다 — 여기서 만들면
-// 회귀 테스트가 그 정의를 잠글 수 없어 라벨 단독 오염 축이 열린다(티켓 #55, QA 사보타주 S3).
-// 🔴 이 파일에 "약 N.NN%" 문자열을 직접 박지 마라. 지금은 회귀가 그걸 못 잡는다(티켓 #59).
+// 연납 공제율 라벨은 lib/car-tax.ts의 PREPAY_DISCOUNT_PERCENT를 import해서 쓴다 — 여기서
+// 만들면 회귀 테스트가 그 정의를 잠글 수 없어 라벨 단독 오염 축이 열린다(티켓 #55, QA 사보타주 S3).
+// 🔴 이 파일에 공제율 값을 직접 박지 마라 — 코드는 물론 **주석에 값을 적는 것도 금지**다
+// (값 박힌 주석은 상수가 바뀌면 그대로 스테일이 된다. 값 대신 상수명으로 지칭할 것).
+// 티켓 #59부터 회귀 스위트 "연납 라벨 컴포넌트 재오염 금지"가 components/·app/ 소스를
+// 스캔해 이 규칙을 강제한다(리터럴 재도입 + 그 상수의 .replace() 가공 둘 다 FAIL).
 // 배기량 힌트 구간표 안내 (상수에서 조합)
 const CC_BRACKET_HINT = `${CC_TAX_BRACKETS[0].maxCc.toLocaleString("ko-KR")}cc 이하 ${CC_TAX_BRACKETS[0].wonPerCc}원, ${CC_TAX_BRACKETS[1].maxCc.toLocaleString("ko-KR")}cc 이하 ${CC_TAX_BRACKETS[1].wonPerCc}원, ${CC_TAX_BRACKETS[1].maxCc.toLocaleString("ko-KR")}cc 초과 ${CC_TAX_BRACKETS[2].wonPerCc}원/cc`;
 // 차령 경감 안내 (상수에서 조합)

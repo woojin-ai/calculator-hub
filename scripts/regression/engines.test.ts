@@ -2183,6 +2183,238 @@ suite("최저시급 리터럴 금지", (t) => {
   );
 });
 
+// =============================================================================
+// 연납 라벨 컴포넌트 재오염 금지 (티켓 #59) — components/·app/ 소스 스캔
+//
+// 왜 필요한가: 티켓 #55는 라벨 문자열의 **정의 지점**(lib/car-tax.ts의
+//   PREPAY_DISCOUNT_PERCENT)만 잠갔다. 컴포넌트가 그 import를 버리면 정의는 멀쩡한데
+//   화면만 오염된다 — QA 사보타주 B(지역 상수 재도입)·C(렌더 지점 문자열 인라인)·
+//   E(import한 값을 .replace()로 가공)가 **469 assertions 전부 PASS**로 통과했다
+//   (2026-08-07 실측). 그 축을 여기서 닫는다.
+//
+// 🔴 이 스위트가 **닫는 것** (이것만이다):
+//   (i) components/·app/ 의 .ts/.tsx 소스에 공제율 리터럴이 다시 나타나면 FAIL.
+//       금지 토큰 3종은 상수에서 런타임 파생한다(하드코딩 금지) → 사보타주 B·C.
+//   (ii) 같은 파일들에서 PREPAY_DISCOUNT_PERCENT 뒤에 프로퍼티/메서드 접근이 오면 FAIL
+//       → 사보타주 E. 가공물은 소스에 정답 토큰이 안 나타나므로 (i)로는 원리적으로
+//       못 잡는다(별도 검출기가 필요한 이유).
+//
+// 🔴 이 스위트가 **열어 두는 것** (과대 선언 금지 — 아래가 전부라는 뜻도 아니다):
+//   · **lib/ 는 스캔하지 않는다.** lib/blog.ts·lib/calculators.ts 에 평문 「약 4.58%」가
+//     13지점 실재한다(2026-08-07 워킹트리 실측 · 문자열 `약 4.58%` 출현 기준 ·
+//     lib/blog.ts 11 + lib/calculators.ts 2). 그건 **별건 티켓 #60**이고, 여기서 lib을
+//     켜면 즉시 13건 FAIL이 난다. lib/car-tax.ts 자신의 4지점(주석)은 정본 문서다.
+//   · **소스 스캔이라 렌더 결과 자체는 보지 않는다.** JSX가 그 라벨을 실제로 화면에
+//     찍는지, 어느 위치에 어떤 값과 함께 찍는지는 여전히 무검증이다.
+//   · 컴포넌트가 라벨을 아예 안 찍거나(조건부 렌더로 숨김), 공제율을 언급하지 않는
+//     **다른 문면으로 오도**하는 경우는 리터럴이 없으므로 전부 PASS한다.
+//   · 간접 가공: `const p = PREPAY_DISCOUNT_PERCENT;` 별칭 후 p.replace(...), 문자열
+//     결합("4"+".58"), 다른 상수로 템플릿 재조립 등 **계산된 문자열**은 못 잡는다.
+//   · 스캔 확장자는 .ts/.tsx 뿐(.js/.mjs/.mdx/.json 미포함), 스캔 루트도 위 2곳뿐.
+// =============================================================================
+
+suite("연납 라벨 컴포넌트 재오염 금지", (t) => {
+  // ── (1) 금지 토큰 파생 (🔴 리터럴 하드코딩 금지) ────────────────────────────
+  //   상수를 정당하게 바꾸면 금지 목록도 같이 이동해야 테스트가 안 썩는다.
+  //   ※ 티켓 #58의 "외부 공시값 리터럴은 제거 금지"와 모순되지 않는다 — 그 앵커는
+  //     위 car-tax 스위트(4.58 대조)가 이미 들고 있고, 여기는 **소스 오염 탐지기**라
+  //     상수를 따라가야 한다. 둘은 역할이 다르다.
+  const pctDigits = (PREPAY_EFFECTIVE_RATE * 100).toFixed(2); // "4.58"
+  const forbidden: { token: string; from: string }[] = [
+    { token: PREPAY_DISCOUNT_PERCENT, from: "PREPAY_DISCOUNT_PERCENT" },
+    { token: `${pctDigits}%`, from: "(PREPAY_EFFECTIVE_RATE*100).toFixed(2) + \"%\"" },
+    { token: pctDigits, from: "(PREPAY_EFFECTIVE_RATE*100).toFixed(2)" },
+  ];
+  // (c) 토큰이 비면 스캔은 항상 0건 = 공허한 PASS. 먼저 잠근다.
+  t.ok(
+    forbidden.length > 0 && forbidden.every((f) => f.token.length > 0),
+    `(c) 금지 토큰 집합이 비어 있지 않다 (${forbidden.length}종)`
+  );
+  t.ok(/^\d+\.\d{2}$/.test(pctDigits), `(c) 파생 숫자 토큰이 소수 2자리 형태다 ("${pctDigits}")`);
+  t.ok(
+    PREPAY_DISCOUNT_PERCENT.includes(pctDigits) && PREPAY_DISCOUNT_PERCENT.endsWith("%"),
+    "(c) 라벨 토큰이 숫자 토큰을 포함한다(세 토큰이 같은 상수에서 파생됨을 확인)"
+  );
+
+  // ── (2) 매처 (숫자 경계는 **토큰별로** 조정) ───────────────────────────────
+  //   토큰마다 양끝 문자 종류가 다르다: "약 4.58%"(한글 시작·% 끝), "4.58%"(숫자 시작·
+  //   % 끝), "4.58"(양끝 숫자). 선례("최저시급 리터럴 금지")처럼 일률적으로
+  //   (?<![\d,.])…(?![\d,.]) 를 씌우면 % 로 끝나는 토큰에서 **오작동**한다 —
+  //   "…약 4.58%." 처럼 문장부호가 뒤에 오면 뒤쪽 lookahead가 마침표를 보고 미적중이
+  //   되어 진짜 오염을 놓친다. 그래서:
+  //     · 앞 경계: 토큰이 **숫자로 시작할 때만** (?<![\d,.])  → "14.58%" 미적중
+  //     · 뒤 경계: 토큰이 **숫자로 끝날 때만** (?![\d,.])     → "4.581" 미적중
+  //   이 조정이 옳다는 것은 아래 양성 6·음성 2/3이 그 자리에서 증명한다.
+  const escapeRe = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const bounded = (token: string): string =>
+    (/^\d/.test(token) ? "(?<![\\d,.])" : "") +
+    escapeRe(token) +
+    (/\d$/.test(token) ? "(?![\\d,.])" : "");
+  // 긴 토큰 우선(최장 일치) — "약 4.58%"가 "4.58%"보다 먼저 시도되어야 유래가 정확해진다.
+  const ordered = [...forbidden].sort((a, b) => b.token.length - a.token.length);
+  const pattern = ordered.map((f) => bounded(f.token)).join("|");
+  const matchAll = (line: string): string[] =>
+    line.match(new RegExp(pattern, "g")) ?? [];
+  const originOf = (tok: string): string =>
+    forbidden.find((f) => f.token === tok)?.from ?? "?";
+
+  // ── (2b) 추가 검출기: import한 상수의 **가공** 축 (사보타주 E) ──────────────
+  //   PREPAY_DISCOUNT_PERCENT.replace(/[\d.]+/, "3.00") 류는 소스에 정답 토큰이
+  //   나타나지 않아 (2)로는 못 잡는다. 식별자 뒤 프로퍼티/메서드 접근을 금지한다.
+  //   · 파일 전체(줄 단위 아님)에 돌린다 — 식별자와 "." 사이에 줄바꿈이 낄 수 있다.
+  //   · 앞: 식별자 문자면 미적중(XPREPAY_DISCOUNT_PERCENT 같은 다른 이름 보호).
+  //   · 뒤: "."에 이어 **식별자 시작 문자**가 와야 적중 → 주석의 문장 끝 마침표
+  //     ("… PREPAY_DISCOUNT_PERCENT." + 줄바꿈/한글)를 오탐하지 않는다.
+  //     ⚠️ 잔여 오탐 여지: 영문 주석에서 마침표 뒤 곧바로 영단어가 오면 걸린다.
+  //        (주석은 배제하지 않는다 — 배제 규칙을 만들면 주석 위장 오염이 열린다.)
+  const LABEL_IDENT = "PREPAY_DISCOUNT_PERCENT";
+  const abuseRe = (): RegExp =>
+    new RegExp(`(?<![A-Za-z0-9_$])${LABEL_IDENT}\\s*\\.\\s*[A-Za-z_$]`, "g");
+  const hasAbuse = (text: string): boolean => abuseRe().test(text);
+
+  // ── (3a) 매처 자기시험: 대조군 ────────────────────────────────────────────
+  // 양성 1 — 지역 상수 재도입 형태(사보타주 B)
+  t.eq(
+    matchAll(`const x = "${PREPAY_DISCOUNT_PERCENT}";`),
+    [PREPAY_DISCOUNT_PERCENT],
+    "(a) 양성 1: 라벨 문자열 리터럴을 적중(지역 상수 재도입)"
+  );
+  // 양성 2 — 퍼센트만 인라인(사보타주 C)
+  t.eq(
+    matchAll(`label={\`1월 연납 (${pctDigits}%)\`}`),
+    [`${pctDigits}%`],
+    "(a) 양성 2: \"N.NN%\" 인라인을 적중"
+  );
+  // 양성 3 — 숫자만 (템플릿 재조립의 재료)
+  t.eq(
+    matchAll(`const rate = ${pctDigits};`),
+    [pctDigits],
+    "(a) 양성 3: 소수 2자리 숫자 리터럴을 적중"
+  );
+  // 양성 4 — 문장부호가 뒤에 오는 경우(% 끝 토큰의 뒤 경계를 뺀 근거)
+  t.eq(
+    matchAll(`// 공제율은 ${PREPAY_DISCOUNT_PERCENT}. 라고 적으면 안 된다`),
+    [PREPAY_DISCOUNT_PERCENT],
+    "(a) 양성 4: 뒤에 마침표가 붙어도 적중(뒤 경계를 % 토큰에서 뺀 조정이 옳다)"
+  );
+  // 양성 5 — .replace() 가공(사보타주 E)
+  t.ok(
+    hasAbuse(`const p = ${LABEL_IDENT}.replace("${pctDigits}", "3.00");`),
+    "(a) 양성 5: 상수의 .replace() 가공을 검출"
+  );
+  // 양성 6 — 줄바꿈이 낀 프로퍼티 접근도 검출
+  t.ok(
+    hasAbuse(`const p = ${LABEL_IDENT}\n  .replace("a", "b");`),
+    "(a) 양성 6: 줄바꿈이 낀 메서드 체이닝도 검출"
+  );
+  // 대조군 비공허 — 위 양성들이 실제로 값을 담고 있는지(빈 문자열 트릭 방지)
+  t.ok(
+    PREPAY_DISCOUNT_PERCENT.length >= 4 && pctDigits.length >= 3,
+    `(a) 대조군 비공허: 토큰이 실제 값을 갖는다 (라벨 ${PREPAY_DISCOUNT_PERCENT.length}자 · 숫자 ${pctDigits.length}자)`
+  );
+
+  // 음성 1 — 더 큰 수의 일부는 미적중
+  t.eq(matchAll(`1${pctDigits}%`), [], "(a) 음성 1: 앞자리가 붙은 큰 수(1N.NN%)는 미적중");
+  t.eq(matchAll(`${pctDigits}1`), [], "(a) 음성 1: 뒷자리가 붙은 큰 수(N.NN1)는 미적중");
+  // 음성 2 — 무관한 비율. 하드코딩 대신 현재 값과 다름을 런타임에 확인하고 쓴다.
+  const otherPct = (PREPAY_EFFECTIVE_RATE * 100 + 1).toFixed(2);
+  t.ok(otherPct !== pctDigits, `(a) 음성 2 비공허: 대조 비율이 실제 값과 다르다 (${otherPct} ≠ ${pctDigits})`);
+  t.eq(matchAll(`약 ${otherPct}%`), [], "(a) 음성 2: 무관한 비율(약 N.NN%)은 미적중");
+  const plainControl = "약 30%";
+  t.ok(
+    !forbidden.some((f) => plainControl.includes(f.token)),
+    "(a) 음성 2 비공허: \"약 30%\"가 금지 토큰을 포함하지 않는다"
+  );
+  t.eq(matchAll(`교육세는 ${plainControl}입니다`), [], "(a) 음성 2: 무관한 정수 비율(약 30%)은 미적중");
+  // 음성 3 — 정상 사용은 가공 검출기에 걸리지 않는다
+  t.ok(!hasAbuse(`label={\`(\${${LABEL_IDENT}})\`}`), "(a) 음성 3: JSX 정상 보간(…})은 미검출");
+  t.ok(!hasAbuse(`import {\n  ${LABEL_IDENT},\n} from "@/lib/car-tax";`), "(a) 음성 3: import 목록(…,)은 미검출");
+  t.ok(!hasAbuse(`const v = X${LABEL_IDENT}.replace("a","b");`), "(a) 음성 3: 접두사가 붙은 다른 식별자는 미검출");
+  t.ok(!hasAbuse(`// 라벨은 ${LABEL_IDENT}. 값을 적지 말 것`), "(a) 음성 3: 주석 문장 끝 마침표는 미검출");
+
+  // ── (3b) 스캔 대상 수집 + 존재 확인(비공허 보장) ───────────────────────────
+  const projectRoot = path.resolve(__dirname, "../..");
+  const scanRoots = ["components", "app"]; // 🔴 lib/ 제외 — 헤더 참조(티켓 #60)
+  const rel = (abs: string): string => path.relative(projectRoot, abs).split(path.sep).join("/");
+  const collect = (dir: string): string[] => {
+    const out: string[] = [];
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) out.push(...collect(full));
+      else if (/\.tsx?$/.test(entry.name)) out.push(full);
+    }
+    return out;
+  };
+
+  const files: string[] = [];
+  for (const root of scanRoots) {
+    const abs = path.resolve(projectRoot, root);
+    t.ok(fs.existsSync(abs), `(b) 스캔 루트 존재: ${root}/`);
+    const found = collect(abs);
+    t.ok(found.length > 0, `(b) 스캔 루트가 비어 있지 않다: ${root}/ (${found.length}개)`);
+    files.push(...found);
+  }
+  const relFiles = files.map(rel);
+  t.ok(relFiles.length > 0, `(b) 스캔 파일 수 > 0 (${relFiles.length}개)`);
+  const CALC = "components/CarTaxCalculator.tsx";
+  t.ok(relFiles.includes(CALC), `(b) 스캔 목록에 ${CALC} 포함(walk가 조용히 깨지면 여기서 FAIL)`);
+
+  // 소비 지점 앵커 — 컴포넌트가 lib에서 라벨을 import해 **실제로 쓰고** 있어야 한다.
+  //   (사용 횟수는 숫자로 못박지 않는다 — 정당한 카피 변경에 썩는다. "1회 이상"만 잠근다.)
+  const calcSrc = fs.readFileSync(path.resolve(projectRoot, CALC), "utf8");
+  const importStmt = calcSrc.match(/import\s*\{[^}]*\}\s*from\s*["']@?\/?lib\/car-tax["'];?/);
+  t.ok(
+    !!importStmt && new RegExp(`(?<![A-Za-z0-9_$])${LABEL_IDENT}(?![A-Za-z0-9_$])`).test(importStmt[0]),
+    `(b) ${CALC} 가 lib/car-tax에서 ${LABEL_IDENT} 를 import한다`
+  );
+  const bodyAfterImport = importStmt ? calcSrc.replace(importStmt[0], "") : calcSrc;
+  const usageCount =
+    bodyAfterImport.match(new RegExp(`(?<![A-Za-z0-9_$])${LABEL_IDENT}(?![A-Za-z0-9_$])`, "g"))?.length ?? 0;
+  t.ok(usageCount >= 1, `(b) ${CALC} 가 import 줄 밖에서 라벨 상수를 1회 이상 사용 (실측 ${usageCount}회)`);
+
+  // ── (4) 실제 스캔 ─────────────────────────────────────────────────────────
+  const literalHits: string[] = [];
+  const abuseHits: string[] = [];
+  for (const file of files) {
+    const content = fs.readFileSync(file, "utf8");
+    const lines = content.split(/\r?\n/);
+    lines.forEach((line, i) => {
+      for (const tok of matchAll(line)) {
+        literalHits.push(
+          `${rel(file)}:${i + 1}  "${tok}"  (유래: ${originOf(tok)})\n      원문: ${line.trim().slice(0, 120)}`
+        );
+      }
+    });
+    const re = abuseRe();
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(content)) !== null) {
+      const lineNo = content.slice(0, m.index).split(/\r?\n/).length;
+      abuseHits.push(
+        `${rel(file)}:${lineNo}  "${m[0].replace(/\s+/g, " ")}…"\n      원문: ${(lines[lineNo - 1] ?? "").trim().slice(0, 120)}`
+      );
+    }
+  }
+
+  const fmt = (hits: string[]): string => {
+    const shown = hits.slice(0, 20);
+    return "\n  " + shown.join("\n  ") + (hits.length > 20 ? `\n  … 외 ${hits.length - 20}건` : "");
+  };
+  t.eq(
+    literalHits.length,
+    0,
+    `연납 공제율 리터럴이 components/·app/ 소스에 하드코딩됨 (${literalHits.length}건)` +
+      fmt(literalHits) +
+      `\n  → 값을 적지 말고 lib/car-tax.ts의 ${LABEL_IDENT} 를 import해서 쓸 것(주석에도 값 금지).`
+  );
+  t.eq(
+    abuseHits.length,
+    0,
+    `${LABEL_IDENT} 를 가공해서 쓰고 있음 (${abuseHits.length}건) — 라벨은 가공 없이 그대로 인쇄할 것` +
+      fmt(abuseHits) +
+      "\n  → 표기를 바꿔야 한다면 컴포넌트가 아니라 lib/car-tax.ts의 정의를 고칠 것."
+  );
+});
+
 // -----------------------------------------------------------------------------
 // 총계
 // -----------------------------------------------------------------------------
