@@ -2,6 +2,7 @@ import type { MetadataRoute } from "next";
 import { calculators } from "@/lib/calculators";
 import { blogPosts } from "@/lib/blog";
 import { SITE_URL } from "@/lib/site";
+import { excelLessons } from "@/lib/excel/lessons";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const staticPages: MetadataRoute.Sitemap = [
@@ -45,6 +46,16 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "monthly",
       priority: 0.7,
     },
+    {
+      url: `${SITE_URL}/excel`,
+      changeFrequency: "weekly",
+      priority: 0.7,
+    },
+    ...excelLessons.map((lesson) => ({
+      url: `${SITE_URL}/excel/${lesson.slug}`,
+      changeFrequency: "monthly" as const,
+      priority: 0.7,
+    })),
     {
       url: `${SITE_URL}/privacy`,
       changeFrequency: "yearly",
