@@ -128,24 +128,6 @@ export default function Home() {
           })}
         </div>
       </section>
-
-      <section className="mt-10">
-        <Link
-          href="/excel"
-          className="flex flex-col gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-5 transition-all hover:border-brand-accent hover:shadow-md sm:flex-row sm:items-center"
-        >
-          <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-white font-mono text-sm font-bold text-emerald-700 ring-1 ring-emerald-200">
-            fx
-          </span>
-          <span className="flex-1">
-            <span className="block text-base font-semibold text-brand-text">엑셀 함수 연습 (새로 열림)</span>
-            <span className="mt-1 block text-xs leading-relaxed text-brand-text-secondary">
-              SUM, COUNTIF, IF, VLOOKUP을 시트에 직접 쳐 보고 바로 채점받으세요. 컴활 실기 함수 연습에도 좋아요.
-            </span>
-          </span>
-          <span className="text-sm font-semibold text-emerald-700">연습하러 가기 →</span>
-        </Link>
-      </section>
     </div>
   );
 }
